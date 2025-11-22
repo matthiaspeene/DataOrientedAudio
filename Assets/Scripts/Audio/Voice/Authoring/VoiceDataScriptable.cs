@@ -76,13 +76,13 @@ namespace DataOrientedAudio.Voice.Authoring
         /// Returns a random gain multiplier within the configured range.
         /// </summary>
         public float GetRandomGain() =>
-            Random.Range(_gainRange.x, _gainRange.y);
+            Random.Range(_gainRange.Min, _gainRange.Max);
 
         /// <summary>
         /// Returns a random pitch multiplier within the configured range.
         /// </summary>
         public float GetRandomPitch() =>
-            Random.Range(_pitchRange.x, _pitchRange.y);
+            Random.Range(_pitchRange.Min, _pitchRange.Max);
 
         /// <summary>
         /// Returns a random repeat delay in seconds.
@@ -94,6 +94,5 @@ namespace DataOrientedAudio.Voice.Authoring
         {
             return Unity.Mathematics.math.pow(2f, pitch / 12f);
         }
-
     }
 }
