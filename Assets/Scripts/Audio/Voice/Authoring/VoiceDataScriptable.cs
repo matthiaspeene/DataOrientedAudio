@@ -22,16 +22,16 @@ namespace DataOrientedAudio.Voice.Authoring
 
         [Header("Level & Pitch")]
         [Tooltip("Min/Max linear gain. X = min, Y = max.")]
-        [SerializeField] private RandomRange _gainRange = new RandomRange(1f, 1f);
+        [SerializeField] private RandomRange _gainRange = new(1f, 1f);
 
         [Tooltip("Min/Max pitch multiplier. X = min, Y = max.")]
-        [SerializeField] private RandomRange _pitchRange = new RandomRange(0f, 0f);
+        [SerializeField] private RandomRange _pitchRange = new(0f, 0f);
 
         [Header("Triggering")]
         [SerializeField] private Triggermode _triggermode = Triggermode.Once;
 
         [Tooltip("Used when TriggerMode is Repeat. X = min delay, Y = max delay (seconds).")]
-        [SerializeField] private Vector2 _repeatDelayRange = new Vector2(0f, 0f);
+        [SerializeField] private Vector2 _repeatDelayRange = new(0f, 0f);
 
         // --- Accessors ---
         public AudioClip[] Clips => _clips;
