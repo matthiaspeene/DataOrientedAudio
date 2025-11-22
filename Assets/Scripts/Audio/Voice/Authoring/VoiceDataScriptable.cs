@@ -1,5 +1,5 @@
 using UnityEngine;
-using DataOrientedAudio.Common.Runtime;
+using DataOrientedAudio.Common;
 
 namespace DataOrientedAudio.Voice.Authoring
 {

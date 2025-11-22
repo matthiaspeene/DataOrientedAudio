@@ -1,7 +1,7 @@
 using Unity.Entities;
 using Unity.Transforms;
 using Unity.Burst;
-using DataOrientedAudio.Common.Runtime;
+using DataOrientedAudio.Common;
 using DataOrientedAudio.Voice.Runtime;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems

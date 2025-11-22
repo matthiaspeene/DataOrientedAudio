@@ -1,4 +1,4 @@
-﻿using DataOrientedAudio.Common.Runtime;
+﻿using DataOrientedAudio.Common;
 using Unity.Entities;
 using Unity.Mathematics;
 

@@ -1,6 +1,6 @@
 using Unity.Entities;
 using UnityEngine;
-using DataOrientedAudio.Common.Runtime;
+using DataOrientedAudio.Common;
 using DataOrientedAudio.Voice.Runtime;
 using Unity.Mathematics;
 using Unity.Transforms;

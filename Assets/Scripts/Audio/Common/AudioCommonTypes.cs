@@ -1,5 +1,5 @@
 using Unity.Mathematics;
-namespace DataOrientedAudio.Common.Runtime
+namespace DataOrientedAudio.Common
 {
     public enum AudioEventSpace
     {

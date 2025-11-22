@@ -1,5 +1,5 @@
 using Unity.Entities;
-using DataOrientedAudio.Common.Runtime;
+using DataOrientedAudio.Common;
 
 namespace DataOrientedAudio.Voice.Runtime
 {

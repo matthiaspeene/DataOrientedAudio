@@ -1,7 +1,7 @@
 // File: Audio/Events/Runtime/AudioEventComponents.cs
 using Unity.Entities;
 using Unity.Mathematics;
-using DataOrientedAudio.Common.Runtime;
+using DataOrientedAudio.Common;
 
 namespace DataOrientedAudio.Events.Runtime
 {
