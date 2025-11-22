@@ -41,17 +41,27 @@ namespace DataOrientedAudio.Voice.Authoring
 
                 // Note: We no longer need a SampleDataBlob buffer - all clip data is in the VoiceBlob
 
-                // 2. Spatialization (Conditional)
-                if (voiceData.Is3D)
+                // 2. Spatialization (Archetypes)
+                switch (voiceData.Spatialization)
                 {
-                    // Add Transform
-                    AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
+                    case AudioEventSpace.World3D:
+                        // Add Transform
+                        AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
+                        break;
 
-                    // Add Spatial Components
-                    AddComponent(voiceEntity, new VoiceFollowsEntity { Target = Entity.Null });
-                    SetComponentEnabled<VoiceFollowsEntity>(voiceEntity, false);
+                    case AudioEventSpace.Attached3D:
+                        // Add Transform
+                        AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
 
-                    AddComponent(voiceEntity, new VoicePositionOffset { Value = float3.zero });
+                        // Add Spatial Components
+                        AddComponent(voiceEntity, new VoiceFollowsEntity { Target = Entity.Null });
+                        AddComponent(voiceEntity, new VoicePositionOffset { Value = float3.zero });
+                        break;
+
+                    case AudioEventSpace.Stereo2D:
+                    default:
+                        // No spatial components
+                        break;
                 }
 
                 // 3. Gain

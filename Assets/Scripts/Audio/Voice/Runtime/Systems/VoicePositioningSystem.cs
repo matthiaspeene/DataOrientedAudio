@@ -1,35 +1,74 @@
 using Unity.Entities;
 using Unity.Transforms;
 using Unity.Burst;
+using Unity.Collections;
+using Unity.Mathematics;
 using DataOrientedAudio.Common;
 using DataOrientedAudio.Voice.Runtime;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
 {
+    #region System
+
+    /// <summary>
+    /// Updates voice positions to follow target entities with optional offset.
+    /// </summary>
     [UpdateInGroup(typeof(TransformSystemGroup))]
     [BurstCompile]
     public partial struct VoicePositioningSystem : ISystem
     {
+        [BurstCompile]
+        public readonly void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<VoiceFollowsEntity>();
+        }
+
+        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // Iterate over all active voices that have spatialization data
-            // Iterate over all active voices that are following an entity
-            foreach (var (transform, follow, offset) in SystemAPI.Query<RefRW<LocalTransform>, RefRO<VoiceFollowsEntity>, RefRO<VoicePositionOffset>>()
-                         .WithAll<VoiceActive>())
+            new VoicePositioningJob
             {
-                Entity target = follow.ValueRO.Target;
-
-                // Check if target exists and has transform
-                if (SystemAPI.HasComponent<LocalTransform>(target))
-                {
-                    var targetTransform = SystemAPI.GetComponent<LocalTransform>(target);
-
-                    // Copy position and rotation
-                    // Apply offset
-                    transform.ValueRW.Position = targetTransform.Position + offset.ValueRO.Value;
-                    transform.ValueRW.Rotation = targetTransform.Rotation;
-                }
-            }
+                TransformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true)
+            }.ScheduleParallel();
         }
     }
+
+    #endregion
+
+    #region Job
+
+    /// <summary>
+    /// Updates voice transforms to follow target entities.
+    /// </summary>
+    [BurstCompile]
+    public partial struct VoicePositioningJob : IJobEntity
+    {
+        #region Variables
+
+        [ReadOnly]
+        public ComponentLookup<LocalTransform> TransformLookup;
+
+        #endregion
+
+        #region Voice Positioning
+
+        /// <summary>
+        /// SIMD-optimized: Uses float3 vector operations.
+        /// </summary>
+        private void Execute(
+            ref LocalTransform transform,
+            in VoiceFollowsEntity follow,
+            in VoicePositionOffset offset)
+        {
+            if (TransformLookup.TryGetComponent(follow.Target, out LocalTransform targetTransform))
+            {
+                transform.Position = targetTransform.Position + offset.Value;
+                transform.Rotation = targetTransform.Rotation;
+            }
+        }
+
+        #endregion
+    }
+
+    #endregion
 }

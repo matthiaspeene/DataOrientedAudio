@@ -2,6 +2,7 @@
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Burst;
+using Unity.Mathematics;
 using DataOrientedAudio.Events.Runtime;
 using DataOrientedAudio.Voice.Runtime;
 using DataOrientedAudio.Common;
@@ -13,27 +14,50 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct VoiceAllocationSystem : ISystem
     {
+        #region Voice Allocation
+
         public void OnUpdate(ref SystemState state)
         {
-            // Query for all emitters that have events
             foreach (var (emitter, eventBuffer) in SystemAPI.Query<RefRW<AudioEventEmitter>, DynamicBuffer<AudioEvent>>())
             {
                 if (eventBuffer.IsEmpty)
                     continue;
 
-                for (int i = 0; i < eventBuffer.Length; i++)
-                {
-                    AudioEvent evt = eventBuffer[i];
-                    AllocateVoice(ref state, evt);
-                }
-
+                ProcessAudioEvents(ref state, eventBuffer);
                 eventBuffer.Clear();
+            }
+        }
+
+        private void ProcessAudioEvents(ref SystemState state, DynamicBuffer<AudioEvent> eventBuffer)
+        {
+            for (int i = 0; i < eventBuffer.Length; i++)
+            {
+                AllocateVoice(ref state, eventBuffer[i]);
             }
         }
 
         private void AllocateVoice(ref SystemState state, AudioEvent evt)
         {
-            // Create a query for inactive voices of the requested type
+            EntityQuery query = CreateVoiceQuery(ref state, evt.VoiceTypeHash);
+            NativeArray<Entity> candidates = query.ToEntityArray(Allocator.Temp);
+            Entity selectedVoice = FindInactiveVoice(candidates);
+
+            if (selectedVoice != Entity.Null)
+            {
+                ActivateVoice(selectedVoice);
+                ApplyVoiceParameters(selectedVoice, evt);
+                ApplySpatializationSettings(selectedVoice, evt);
+            }
+
+            candidates.Dispose();
+        }
+
+        #endregion
+
+        #region Voice Selection
+
+        private EntityQuery CreateVoiceQuery(ref SystemState state, int voiceTypeHash)
+        {
             var query = state.GetEntityQuery(
                 ComponentType.ReadWrite<VoiceActive>(),
                 ComponentType.ReadWrite<StartVoiceRequest>(),
@@ -42,81 +66,92 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 ComponentType.ReadOnly<VoiceTypeID>()
             );
 
-            // Filter by the specific VoiceTypeID
-            query.SetSharedComponentFilter(new VoiceTypeID { Value = evt.VoiceTypeHash });
+            query.SetSharedComponentFilter(new VoiceTypeID { Value = voiceTypeHash });
+            return query;
+        }
 
-            // Find candidates that are NOT active
-            // Note: We can't easily filter by "Enabled=false" in the query setup with SharedFilters efficiently in a loop 
-            // without creating new queries or using Enableable components logic.
-            // A better approach for high performance:
-            // Maintain a NativeList of free voices per TypeID? 
-            // For now, let's iterate candidates.
-
-            var candidates = query.ToEntityArray(Allocator.Temp);
-            Entity selectedVoice = Entity.Null;
-
+        private readonly Entity FindInactiveVoice(NativeArray<Entity> candidates)
+        {
+            // TODO: Maintain a NativeList of free voices per TypeID for better performance
             foreach (var candidate in candidates)
             {
                 if (!SystemAPI.IsComponentEnabled<VoiceActive>(candidate))
                 {
-                    selectedVoice = candidate;
-                    break;
+                    return candidate;
                 }
             }
 
-            if (selectedVoice != Entity.Null)
-            {
-                // Activate
-                SystemAPI.SetComponentEnabled<VoiceActive>(selectedVoice, true);
-                SystemAPI.SetComponentEnabled<StartVoiceRequest>(selectedVoice, true);
-
-                // Apply Event parameters
-                // Gain
-                var gains = SystemAPI.GetBuffer<OutChannelGain>(selectedVoice);
-                for (int k = 0; k < gains.Length; ++k)
-                {
-                    gains[k] = new OutChannelGain { Value = evt.Gain };
-                }
-
-                // PlaybackSpeed
-                SystemAPI.SetComponent(selectedVoice, new OutPlaybackSpeed { Value = evt.PlaybackSpeed });
-
-                // Reset Age
-                var voiceActive = SystemAPI.GetComponent<VoiceActive>(selectedVoice);
-                voiceActive.Age = 0;
-                SystemAPI.SetComponent(selectedVoice, voiceActive);
-
-                // Spatialization
-                // Note: We no longer toggle components. The voice is either 3D or 2D by baking.
-                // We just set data if applicable.
-
-                if (evt.Space == AudioEventSpace.World3D)
-                {
-                    // If the voice is 2D (no Transform), this will just fail silently (HasComponent check inside SetComponent usually not present, but SetComponent on missing component throws in Editor).
-                    // We should check if it has Transform if we want to be safe, or assume the allocator matched correctly.
-                    // For now, let's check.
-                    if (SystemAPI.HasComponent<LocalTransform>(selectedVoice))
-                    {
-                        var transform = SystemAPI.GetComponent<LocalTransform>(selectedVoice);
-                        transform.Position = evt.Position;
-                        SystemAPI.SetComponent(selectedVoice, transform);
-                    }
-                }
-                else if (evt.Space == AudioEventSpace.Attached3D)
-                {
-                    if (SystemAPI.HasComponent<VoiceFollowsEntity>(selectedVoice))
-                    {
-                        SystemAPI.SetComponentEnabled<VoiceFollowsEntity>(selectedVoice, true);
-                        SystemAPI.SetComponent(selectedVoice, new VoiceFollowsEntity { Target = evt.AttachTo });
-
-                        // Set offset
-                        SystemAPI.SetComponent(selectedVoice, new VoicePositionOffset { Value = evt.Position });
-                    }
-                }
-                // Stereo2D: Do nothing.
-            }
-
-            candidates.Dispose();
+            return Entity.Null;
         }
+
+        #endregion
+
+        #region Voice Activation
+
+        private readonly void ActivateVoice(Entity voice)
+        {
+            SystemAPI.SetComponentEnabled<VoiceActive>(voice, true);
+            SystemAPI.SetComponentEnabled<StartVoiceRequest>(voice, true);
+        }
+
+        private void ApplyVoiceParameters(Entity voice, AudioEvent evt)
+        {
+            ApplyGain(voice, evt.Gain);
+            ApplyPlaybackSpeed(voice, evt.PlaybackSpeed);
+            ResetVoiceAge(voice);
+        }
+
+        #endregion
+
+        #region Voice Parameters
+
+        private void ApplyGain(Entity voice, float gain)
+        {
+            var gains = SystemAPI.GetBuffer<OutChannelGain>(voice);
+            for (int k = 0; k < gains.Length; ++k)
+            {
+                gains[k] = new OutChannelGain { Value = gain };
+            }
+        }
+
+        private void ApplyPlaybackSpeed(Entity voice, float playbackSpeed)
+        {
+            SystemAPI.SetComponent(voice, new OutPlaybackSpeed { Value = playbackSpeed });
+        }
+
+        private readonly void ResetVoiceAge(Entity voice)
+        {
+            var voiceActive = SystemAPI.GetComponent<VoiceActive>(voice);
+            voiceActive.Age = 0;
+            SystemAPI.SetComponent(voice, voiceActive);
+        }
+
+        #endregion
+
+        #region Spatialization
+
+        private void ApplySpatializationSettings(Entity voice, AudioEvent evt)
+        {
+            // TODO: Query Per Archetype. This branching is technically not needed. We can use the archetype to determine behavior beforehand.
+            if (SystemAPI.HasComponent<VoiceFollowsEntity>(voice))
+            {
+                // Attached 3D
+                SystemAPI.SetComponent(voice, new VoiceFollowsEntity { Target = evt.AttachTo });
+                SystemAPI.SetComponent(voice, new VoicePositionOffset { Value = evt.Position });
+            }
+            else if (SystemAPI.HasComponent<LocalTransform>(voice))
+            {
+                // World 3D
+                var transform = SystemAPI.GetComponent<LocalTransform>(voice);
+                transform.Position = evt.Position;
+                SystemAPI.SetComponent(voice, transform);
+            }
+            //else
+            //{
+            //    2D
+            //}
+        }
+
+        #endregion
     }
 }

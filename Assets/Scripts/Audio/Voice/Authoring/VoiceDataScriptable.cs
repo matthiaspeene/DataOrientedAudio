@@ -35,7 +35,9 @@ namespace DataOrientedAudio.Voice.Authoring
 
         [Header("Pooling")]
         [SerializeField] private int _maxVoices = 16;
-        [SerializeField] private bool _is3D = true;
+
+        [Header("Spatialization")]
+        [SerializeField] private AudioEventSpace _space = AudioEventSpace.World3D;
 
         // --- Accessors ---
         public AudioClip[] Clips => _clips;
@@ -44,7 +46,7 @@ namespace DataOrientedAudio.Voice.Authoring
         public Triggermode TriggerMode => _triggermode;
         public Vector2 RepeatDelayRange => _repeatDelayRange;
         public int MaxVoices => _maxVoices;
-        public bool Is3D => _is3D;
+        public AudioEventSpace Space => _space;
 
         public RandomRange GetPitchAsPlaybackSpeedRange()
         {
@@ -57,7 +59,6 @@ namespace DataOrientedAudio.Voice.Authoring
         public bool UseRandomGain => _gainRange.Min != _gainRange.Max;
         public bool UseRandomPitch => _pitchRange.Min != _pitchRange.Max;
         #endregion
-
         private void OnValidate()
         {
             _gainRange.Min = Mathf.Min(_gainRange.Min, _gainRange.Max);
