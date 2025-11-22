@@ -33,12 +33,18 @@ namespace DataOrientedAudio.Voice.Authoring
         [Tooltip("Used when TriggerMode is Repeat. X = min delay, Y = max delay (seconds).")]
         [SerializeField] private Vector2 _repeatDelayRange = new(0f, 0f);
 
+        [Header("Pooling")]
+        [SerializeField] private int _maxVoices = 16;
+        [SerializeField] private bool _is3D = true;
+
         // --- Accessors ---
         public AudioClip[] Clips => _clips;
         public RandomRange GainRange => _gainRange;
         public RandomRange PitchRange => _pitchRange;
         public Triggermode TriggerMode => _triggermode;
         public Vector2 RepeatDelayRange => _repeatDelayRange;
+        public int MaxVoices => _maxVoices;
+        public bool Is3D => _is3D;
 
         public RandomRange GetPitchAsPlaybackSpeedRange()
         {

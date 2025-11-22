@@ -3,6 +3,7 @@ using UnityEngine;
 using DataOrientedAudio.Common.Runtime;
 using DataOrientedAudio.Voice.Runtime;
 using Unity.Mathematics;
+using Unity.Transforms;
 
 namespace DataOrientedAudio.Voice.Authoring
 {
@@ -10,79 +11,67 @@ namespace DataOrientedAudio.Voice.Authoring
     {
         public override void Bake(VoiceAuthoring authoring)
         {
-            VoiceDataScriptable voiceData = authoring.voiceData;
-            // Change TransformUsageFlags if you tie this voice entity to world position.
-            var entity = GetEntity(TransformUsageFlags.WorldSpace);
-
-            // Spatialization Components
-            AddComponent<VoiceIsSpatial>(entity);
-            SetComponentEnabled<VoiceIsSpatial>(entity, false);
-
-            AddComponent(entity, new VoiceFollowsEntity { Target = Entity.Null });
-            SetComponentEnabled<VoiceFollowsEntity>(entity, false);
-
-            AddComponent(entity, new VoicePositionOffset { Value = float3.zero });
-
-            #region Gain
-            // Allocate channel gain buffer and init to 1.0f.
-            var gains = AddBuffer<OutChannelGain>(entity);
-
-            // Harcode to stereo for now; extend later as needed. TBA::Author the master output count.
-            int outputChannelCount = 2;
-            for (int i = 0; i < outputChannelCount; i++)
+            VoiceDataScriptable voiceData = authoring.VoiceData;
+            // Pool Loop
+            for (int v = 0; v < voiceData.MaxVoices; v++)
             {
-                gains.Add(new OutChannelGain { Value = 1f });
-            }
+                // Create entity (first one is 'entity', others are additional)
+                var voiceEntity = (v == 0) ? GetEntity(TransformUsageFlags.None) : CreateAdditionalEntity(TransformUsageFlags.None);
 
-            AddComponent(entity, new MixGainMod
-            {
-                BusIndex = -1, // TBA: for future use.
-                Value = 1f
-            });
+                // 1. Core Data
+                int typeId = voiceData.name.GetHashCode();
+                AddSharedComponent(voiceEntity, new VoiceTypeID { Value = typeId });
 
-            if (voiceData.UseRandomGain)
-            {
-                AddComponent(entity, new RandomGainMod
+                // 2. Spatialization (Conditional)
+                if (voiceData.Is3D)
                 {
-                    Range = voiceData.GainRange,
-                    Result = 1f
-                });
-            }
-            #endregion
+                    // Add Transform
+                    AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
 
-            #region PlaybackSpeed
+                    // Add Spatial Components
+                    // Note: We don't need VoiceIsSpatial anymore as presence of Transform implies 3D capability in this design,
+                    // OR we keep it for logic. The plan said remove it.
+                    // We DO need VoiceFollowsEntity for attachment.
+                    AddComponent(voiceEntity, new VoiceFollowsEntity { Target = Entity.Null });
+                    SetComponentEnabled<VoiceFollowsEntity>(voiceEntity, false);
 
-            RandomRange playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
-            AddComponent(entity, new OutPlaybackSpeed
-            {
-                Value = playbackSpeedRange.Max
-            });
+                    AddComponent(voiceEntity, new VoicePositionOffset { Value = float3.zero });
+                }
 
-            if (voiceData.UseRandomPitch)
-            {
-                AddComponent(entity, new RandomPlaybackSpeedMod
+                // 3. Gain
+                var gains = AddBuffer<OutChannelGain>(voiceEntity);
+                int outputChannelCount = 2; // Hardcoded stereo
+                for (int i = 0; i < outputChannelCount; i++)
                 {
-                    Range = playbackSpeedRange,
-                    Result = 0f
-                });
+                    gains.Add(new OutChannelGain { Value = 1f });
+                }
+
+                AddComponent(voiceEntity, new MixGainMod { BusIndex = -1, Value = 1f });
+
+                if (voiceData.UseRandomGain)
+                {
+                    AddComponent(voiceEntity, new RandomGainMod { Range = voiceData.GainRange, Result = 1f });
+                }
+
+                // 4. Playback Speed
+                RandomRange playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
+                AddComponent(voiceEntity, new OutPlaybackSpeed { Value = playbackSpeedRange.Max });
+
+                if (voiceData.UseRandomPitch)
+                {
+                    AddComponent(voiceEntity, new RandomPlaybackSpeedMod { Range = playbackSpeedRange, Result = 0f });
+                }
+
+                // 5. State
+                AddComponent(voiceEntity, new VoiceActive { Age = 0f });
+                SetComponentEnabled<VoiceActive>(voiceEntity, false);
+
+                AddComponent<StartVoiceRequest>(voiceEntity);
+                SetComponentEnabled<StartVoiceRequest>(voiceEntity, false);
+
+                AddComponent<StopVoiceRequest>(voiceEntity);
+                SetComponentEnabled<StopVoiceRequest>(voiceEntity, false);
             }
-            #endregion
-
-            #region State Components
-            // These are toggled by systems; start disabled.
-            AddComponent(entity, new VoiceActive { Age = 0f });
-            SetComponentEnabled<VoiceActive>(entity, false);
-
-            AddComponent<StartVoiceRequest>(entity);
-            SetComponentEnabled<StartVoiceRequest>(entity, false);
-
-            AddComponent<StopVoiceRequest>(entity);
-            SetComponentEnabled<StopVoiceRequest>(entity, false);
-            #endregion
-
-            // Add VoiceTypeID shared component for allocation
-            int typeId = voiceData.name.GetHashCode();
-            AddSharedComponent(entity, new VoiceTypeID { Value = typeId });
         }
     }
 }

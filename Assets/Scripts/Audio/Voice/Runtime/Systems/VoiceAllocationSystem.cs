@@ -1,3 +1,4 @@
+
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Burst;
@@ -86,30 +87,33 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 SystemAPI.SetComponent(selectedVoice, voiceActive);
 
                 // Spatialization
-                if (evt.Space == AudioEventSpace.Stereo2D)
-                {
-                    SystemAPI.SetComponentEnabled<VoiceIsSpatial>(selectedVoice, false);
-                    SystemAPI.SetComponentEnabled<VoiceFollowsEntity>(selectedVoice, false);
-                }
-                else if (evt.Space == AudioEventSpace.World3D)
-                {
-                    SystemAPI.SetComponentEnabled<VoiceIsSpatial>(selectedVoice, true);
-                    SystemAPI.SetComponentEnabled<VoiceFollowsEntity>(selectedVoice, false);
+                // Note: We no longer toggle components. The voice is either 3D or 2D by baking.
+                // We just set data if applicable.
 
-                    // Set position directly
-                    var transform = SystemAPI.GetComponent<LocalTransform>(selectedVoice);
-                    transform.Position = evt.Position;
-                    SystemAPI.SetComponent(selectedVoice, transform);
+                if (evt.Space == AudioEventSpace.World3D)
+                {
+                    // If the voice is 2D (no Transform), this will just fail silently (HasComponent check inside SetComponent usually not present, but SetComponent on missing component throws in Editor).
+                    // We should check if it has Transform if we want to be safe, or assume the allocator matched correctly.
+                    // For now, let's check.
+                    if (SystemAPI.HasComponent<LocalTransform>(selectedVoice))
+                    {
+                        var transform = SystemAPI.GetComponent<LocalTransform>(selectedVoice);
+                        transform.Position = evt.Position;
+                        SystemAPI.SetComponent(selectedVoice, transform);
+                    }
                 }
                 else if (evt.Space == AudioEventSpace.Attached3D)
                 {
-                    SystemAPI.SetComponentEnabled<VoiceIsSpatial>(selectedVoice, true);
-                    SystemAPI.SetComponentEnabled<VoiceFollowsEntity>(selectedVoice, true);
-                    SystemAPI.SetComponent(selectedVoice, new VoiceFollowsEntity { Target = evt.AttachTo });
+                    if (SystemAPI.HasComponent<VoiceFollowsEntity>(selectedVoice))
+                    {
+                        SystemAPI.SetComponentEnabled<VoiceFollowsEntity>(selectedVoice, true);
+                        SystemAPI.SetComponent(selectedVoice, new VoiceFollowsEntity { Target = evt.AttachTo });
 
-                    // Set offset
-                    SystemAPI.SetComponent(selectedVoice, new VoicePositionOffset { Value = evt.Position });
+                        // Set offset
+                        SystemAPI.SetComponent(selectedVoice, new VoicePositionOffset { Value = evt.Position });
+                    }
                 }
+                // Stereo2D: Do nothing.
             }
 
             candidates.Dispose();

@@ -6,6 +6,6 @@ namespace DataOrientedAudio.Voice.Authoring
 {
     public class VoiceAuthoring : MonoBehaviour
     {
-        public VoiceDataScriptable voiceData { get; private set; }
+        public VoiceDataScriptable VoiceData { get; private set; }
     }
 }
