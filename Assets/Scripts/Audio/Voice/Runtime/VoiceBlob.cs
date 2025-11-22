@@ -22,12 +22,11 @@ namespace DataOrientedAudio.Voice.Runtime
     /// </summary>
     public struct VoiceBlob
     {
+        // TODO: This is a placeholder solution to clips. The final version should seperate clip data from voice data so that multiple voices can share the same clip data.
         public BlobArray<ClipData> Clips; // Array of all clips for random selection
         public float GainMin;             // Minimum gain multiplier
         public float GainMax;             // Maximum gain multiplier
         public float PlaybackSpeedMin;    // Minimum playback speed multiplier
         public float PlaybackSpeedMax;    // Maximum playback speed multiplier
-
-        // TBA: Add other params as they come (e.g., trigger mode, repeat delay range, etc.)
     }
 }

@@ -4,7 +4,7 @@ using DataOrientedAudio.Core.Runtime;
 
 namespace DataOrientedAudio.Core.Authoring
 {
-    // TBA make this system listen to the AudioSettings changes at runtime.
+    // TODO: make this system listen to the AudioSettings changes at runtime.
     public class AudioOutputConfigAuthoring : MonoBehaviour
     {
         [Header("Output")]

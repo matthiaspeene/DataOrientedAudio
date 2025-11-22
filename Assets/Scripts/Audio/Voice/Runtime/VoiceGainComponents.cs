@@ -18,11 +18,11 @@ namespace DataOrientedAudio.Voice.Runtime
     // Gain coming from a mix group / bus.
     public struct MixGainMod : IComponentData
     {
-        public int BusIndex; // TBA: for future use.
+        public int BusIndex; // TODO:: for future use.
         public float Value;
     }
 
-    /* TBA
+    /* TODO:
     // Example of future modulator hookup.
     public struct GainModulatorMod : IComponentData
     {
