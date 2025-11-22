@@ -6,6 +6,16 @@ namespace DataOrientedAudio.Voice.Authoring
 {
     public class VoiceAuthoring : MonoBehaviour
     {
-        public VoiceDataScriptable VoiceData { get; private set; }
+        public VoiceDataScriptable VoiceData;
+
+        private void OnValidate()
+        {
+            if (VoiceData == null)
+            {
+                Debug.LogWarning($"VoiceAuthoring on '{gameObject.name}' has no VoiceData assigned. Skipping bake.", this);
+            }
+
+            this.gameObject.name = $"Voice_{VoiceData.name}";
+        }
     }
 }

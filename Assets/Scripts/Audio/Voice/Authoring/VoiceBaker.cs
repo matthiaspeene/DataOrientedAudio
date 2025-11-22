@@ -1,10 +1,10 @@
 using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Collections;
+using Unity.Transforms;
 using UnityEngine;
 using DataOrientedAudio.Common;
 using DataOrientedAudio.Voice.Runtime;
-using Unity.Mathematics;
-using Unity.Transforms;
-using Unity.Collections;
 
 namespace DataOrientedAudio.Voice.Authoring
 {
@@ -14,6 +14,13 @@ namespace DataOrientedAudio.Voice.Authoring
         {
             VoiceDataScriptable voiceData = authoring.VoiceData;
 
+            // Early exit if no voice data is assigned
+            if (voiceData == null)
+            {
+                Debug.LogWarning($"VoiceAuthoring on '{authoring.gameObject.name}' has no VoiceData assigned. Skipping bake.", authoring);
+                return;
+            }
+
             // Create the VoiceBlob asset once for all voices of this type
             // This blob contains ALL clip data for this voice type
             BlobAssetReference<VoiceBlob> voiceBlobRef = CreateVoiceBlob(voiceData);
@@ -22,7 +29,7 @@ namespace DataOrientedAudio.Voice.Authoring
             for (int v = 0; v < voiceData.MaxVoices; v++)
             {
                 // Create entity (first one is 'entity', others are additional)
-                var voiceEntity = (v == 0) ? GetEntity(TransformUsageFlags.None) : CreateAdditionalEntity(TransformUsageFlags.None);
+                Entity voiceEntity = (v == 0) ? GetEntity(TransformUsageFlags.None) : CreateAdditionalEntity(TransformUsageFlags.None, false, voiceBlobRef.ToString());
 
                 // 1. Core Data
                 int typeId = voiceData.name.GetHashCode();
