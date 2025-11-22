@@ -8,14 +8,14 @@ namespace DataOrientedAudio.Events.Runtime
     // One play request, stored in a DynamicBuffer on the emitter.
     public struct AudioEvent : IBufferElementData
     {
-        public Entity VoiceDef;        // Entity that holds VoiceDataBlobRef (baked from SO)
+        public int VoiceTypeHash;      // Hash of the VoiceData name (replaces Entity VoiceDef)
 
         public AudioEventSpace Space;  // Stereo2D / World3D / Attached3D
 
         public float Gain;             // Override gain (1.0 = default)
-        public float Pitch;            // Override pitch (1.0 = default speed)
+        public float PlaybackSpeed;    // Override playback speed (1.0 = default speed)
 
-        public float3 Position;        // Used if Space == World3D
+        public float3 Position;        // Used if Space == World3D, Behaves as an offset if Space == Attached3D
         public Entity AttachTo;        // Used if Space == Attached3D
     }
 

@@ -20,14 +20,14 @@ namespace DataOrientedAudio.Common.Runtime
             Max = max;
         }
 
-        public float Clamp(float value)
+        public readonly float Clamp(float value)
         {
             if (value < Min) return Min;
             if (value > Max) return Max;
             return value;
         }
 
-        public float Lerp(float t)
+        public readonly float Lerp(float t)
         {
             return Min + (Max - Min) * t;
         }

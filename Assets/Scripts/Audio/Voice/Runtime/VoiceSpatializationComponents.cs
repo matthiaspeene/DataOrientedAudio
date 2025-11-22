@@ -4,21 +4,25 @@ using Unity.Mathematics;
 
 namespace DataOrientedAudio.Voice.Runtime
 {
-    internal class VoiceSpatializationComponents
+    // Tag: If enabled, this voice is treated as 3D/Spatial.
+    // If disabled, it is 2D (Stereo).
+    public struct VoiceIsSpatial : IComponentData, IEnableableComponent { }
+
+    // Data: If enabled, this voice follows a target entity.
+    public struct VoiceFollowsEntity : IComponentData, IEnableableComponent
     {
-        // Resolved spatialization data for a single voice entity.
-        public struct VoiceSpatialization : IComponentData
-        {
-            public AudioEventSpace Space;
+        public Entity Target;
+    }
 
-            public float3 Position;   // For World3D; can also be used as an offset.
-            public Entity AttachTo;   // For Attached3D; the entity whose transform we follow.
-        }
+    // Data: Optional offset. Can be used with or without following.
+    public struct VoicePositionOffset : IComponentData
+    {
+        public float3 Value;
+    }
 
-        // Optional: link a voice back to its logical owner / emitter.
-        public struct VoiceOwner : IComponentData
-        {
-            public Entity Emitter;
-        }
+    // Optional: link a voice back to its logical owner / emitter.
+    public struct VoiceOwner : IComponentData
+    {
+        public Entity Emitter;
     }
 }

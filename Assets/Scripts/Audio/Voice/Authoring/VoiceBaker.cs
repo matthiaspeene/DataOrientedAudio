@@ -2,6 +2,7 @@ using Unity.Entities;
 using UnityEngine;
 using DataOrientedAudio.Common.Runtime;
 using DataOrientedAudio.Voice.Runtime;
+using Unity.Mathematics;
 
 namespace DataOrientedAudio.Voice.Authoring
 {
@@ -11,7 +12,16 @@ namespace DataOrientedAudio.Voice.Authoring
         {
             VoiceDataScriptable voiceData = authoring.voiceData;
             // Change TransformUsageFlags if you tie this voice entity to world position.
-            var entity = GetEntity(TransformUsageFlags.None);
+            var entity = GetEntity(TransformUsageFlags.WorldSpace);
+
+            // Spatialization Components
+            AddComponent<VoiceIsSpatial>(entity);
+            SetComponentEnabled<VoiceIsSpatial>(entity, false);
+
+            AddComponent(entity, new VoiceFollowsEntity { Target = Entity.Null });
+            SetComponentEnabled<VoiceFollowsEntity>(entity, false);
+
+            AddComponent(entity, new VoicePositionOffset { Value = float3.zero });
 
             #region Gain
             // Allocate channel gain buffer and init to 1.0f.
@@ -69,6 +79,10 @@ namespace DataOrientedAudio.Voice.Authoring
             AddComponent<StopVoiceRequest>(entity);
             SetComponentEnabled<StopVoiceRequest>(entity, false);
             #endregion
+
+            // Add VoiceTypeID shared component for allocation
+            int typeId = voiceData.name.GetHashCode();
+            AddSharedComponent(entity, new VoiceTypeID { Value = typeId });
         }
     }
 }
