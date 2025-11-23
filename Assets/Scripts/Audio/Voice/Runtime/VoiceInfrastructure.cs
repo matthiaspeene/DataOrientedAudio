@@ -1,0 +1,45 @@
+using Unity.Entities;
+
+namespace DataOrientedAudio.Voice.Runtime
+{
+    #region Voice Commands
+
+    public enum VoiceCommandType : byte
+    {
+        SetGain,
+        SetActive,
+        // Add more when needed (e.g., SetPitch, SetPosition)
+    }
+
+    public struct VoiceCommand
+    {
+        public VoiceCommandType Type;
+        public int ArchetypeIndex;
+        public int LocalVoiceIndex;
+        public float Value;   // Gain or 0/1 for active
+    }
+
+    #endregion
+
+    #region Voice Identification
+
+    public struct VoiceTypeID : ISharedComponentData
+    {
+        public int Value;
+    }
+
+    #endregion
+
+    #region Voice Blob Reference
+
+    /// <summary>
+    /// Component that holds a reference to the VoiceBlob asset.
+    /// All voices of the same type share the same blob asset.
+    /// </summary>
+    public struct VoiceBlobReference : IComponentData
+    {
+        public BlobAssetReference<VoiceBlob> Value;
+    }
+
+    #endregion
+}
