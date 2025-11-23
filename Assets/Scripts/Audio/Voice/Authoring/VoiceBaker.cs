@@ -36,13 +36,13 @@ namespace DataOrientedAudio.Voice.Authoring
                 AddSharedComponent(voiceEntity, new VoiceTypeID { Value = typeId });
 
                 // 1b. Add VoiceBlob reference (shared immutable data containing all clips)
-                AddBlobAsset(ref voiceBlobRef, out var hash);
+                AddBlobAsset(ref voiceBlobRef, out _);
                 AddComponent(voiceEntity, new VoiceBlobReference { Value = voiceBlobRef });
 
                 // Note: We no longer need a SampleDataBlob buffer - all clip data is in the VoiceBlob
 
                 // 2. Spatialization (Archetypes)
-                switch (voiceData.Spatialization)
+                switch (voiceData.Space)
                 {
                     case AudioEventSpace.World3D:
                         // Add Transform
@@ -107,61 +107,59 @@ namespace DataOrientedAudio.Voice.Authoring
         /// </summary>
         private BlobAssetReference<VoiceBlob> CreateVoiceBlob(VoiceDataScriptable voiceData)
         {
-            using (var builder = new BlobBuilder(Allocator.Temp))
+            using var builder = new BlobBuilder(Allocator.Temp);
+            ref VoiceBlob voiceBlob = ref builder.ConstructRoot<VoiceBlob>();
+
+            // Set voice-level parameters
+            var gainRange = voiceData.GainRange;
+            voiceBlob.GainMin = gainRange.Min;
+            voiceBlob.GainMax = gainRange.Max;
+
+            var playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
+            voiceBlob.PlaybackSpeedMin = playbackSpeedRange.Min;
+            voiceBlob.PlaybackSpeedMax = playbackSpeedRange.Max;
+
+            // Count valid clips
+            int validClipCount = 0;
+            for (int i = 0; i < voiceData.Clips.Length; i++)
             {
-                ref VoiceBlob voiceBlob = ref builder.ConstructRoot<VoiceBlob>();
-
-                // Set voice-level parameters
-                var gainRange = voiceData.GainRange;
-                voiceBlob.GainMin = gainRange.Min;
-                voiceBlob.GainMax = gainRange.Max;
-
-                var playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
-                voiceBlob.PlaybackSpeedMin = playbackSpeedRange.Min;
-                voiceBlob.PlaybackSpeedMax = playbackSpeedRange.Max;
-
-                // Count valid clips
-                int validClipCount = 0;
-                for (int i = 0; i < voiceData.Clips.Length; i++)
-                {
-                    if (voiceData.Clips[i] != null)
-                        validClipCount++;
-                }
-
-                // Allocate clips array
-                var clipsArray = builder.Allocate(ref voiceBlob.Clips, validClipCount);
-
-                // Build each clip's data
-                int clipIndex = 0;
-                for (int i = 0; i < voiceData.Clips.Length; i++)
-                {
-                    AudioClip clip = voiceData.Clips[i];
-                    if (clip == null)
-                        continue;
-
-                    ref ClipData clipData = ref clipsArray[clipIndex];
-
-                    // Get audio data from Unity AudioClip
-                    float[] samples = new float[clip.samples * clip.channels];
-                    clip.GetData(samples, 0);
-
-                    // Allocate and copy sample data into blob array
-                    var samplesArray = builder.Allocate(ref clipData.Samples, samples.Length);
-                    for (int s = 0; s < samples.Length; s++)
-                    {
-                        samplesArray[s] = samples[s];
-                    }
-
-                    // Set clip metadata
-                    clipData.ChannelCount = clip.channels;
-                    clipData.SampleRate = clip.frequency;
-                    clipData.SampleCount = clip.samples;
-
-                    clipIndex++;
-                }
-
-                return builder.CreateBlobAssetReference<VoiceBlob>(Allocator.Persistent);
+                if (voiceData.Clips[i] != null)
+                    validClipCount++;
             }
+
+            // Allocate clips array
+            var clipsArray = builder.Allocate(ref voiceBlob.Clips, validClipCount);
+
+            // Build each clip's data
+            int clipIndex = 0;
+            for (int i = 0; i < voiceData.Clips.Length; i++)
+            {
+                AudioClip clip = voiceData.Clips[i];
+                if (clip == null)
+                    continue;
+
+                ref ClipData clipData = ref clipsArray[clipIndex];
+
+                // Get audio data from Unity AudioClip
+                float[] samples = new float[clip.samples * clip.channels];
+                clip.GetData(samples, 0);
+
+                // Allocate and copy sample data into blob array
+                var samplesArray = builder.Allocate(ref clipData.Samples, samples.Length);
+                for (int s = 0; s < samples.Length; s++)
+                {
+                    samplesArray[s] = samples[s];
+                }
+
+                // Set clip metadata
+                clipData.ChannelCount = clip.channels;
+                clipData.SampleRate = clip.frequency;
+                clipData.SampleCount = clip.samples;
+
+                clipIndex++;
+            }
+
+            return builder.CreateBlobAssetReference<VoiceBlob>(Allocator.Persistent);
         }
     }
 }
