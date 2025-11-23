@@ -10,7 +10,7 @@ using Unity.Transforms;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
 {
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(AudioVoiceLifecycleGroup))]
     [BurstCompile]
     public partial struct VoiceAllocationSystem : ISystem
     {
@@ -40,13 +40,13 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         {
             EntityQuery query = CreateVoiceQuery(ref state, evt.VoiceTypeHash);
             NativeArray<Entity> candidates = query.ToEntityArray(Allocator.Temp);
-            Entity selectedVoice = FindInactiveVoice(candidates);
+            Entity selectedVoice = FindInactiveVoice(ref state, candidates);
 
             if (selectedVoice != Entity.Null)
             {
-                ActivateVoice(selectedVoice);
-                ApplyVoiceParameters(selectedVoice, evt);
-                ApplySpatializationSettings(selectedVoice, evt);
+                ActivateVoice(ref state, selectedVoice);
+                ApplyVoiceParameters(ref state, selectedVoice, evt);
+                ApplySpatializationSettings(ref state, selectedVoice, evt);
             }
 
             candidates.Dispose();
@@ -70,12 +70,12 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             return query;
         }
 
-        private readonly Entity FindInactiveVoice(NativeArray<Entity> candidates)
+        private Entity FindInactiveVoice(ref SystemState state, NativeArray<Entity> candidates)
         {
             // TODO: Maintain a NativeList of free voices per TypeID for better performance
             foreach (var candidate in candidates)
             {
-                if (!SystemAPI.IsComponentEnabled<VoiceActive>(candidate))
+                if (!state.EntityManager.IsComponentEnabled<VoiceActive>(candidate))
                 {
                     return candidate;
                 }
@@ -88,63 +88,63 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         #region Voice Activation
 
-        private readonly void ActivateVoice(Entity voice)
+        private void ActivateVoice(ref SystemState state, Entity voice)
         {
-            SystemAPI.SetComponentEnabled<VoiceActive>(voice, true);
-            SystemAPI.SetComponentEnabled<StartVoiceRequest>(voice, true);
+            state.EntityManager.SetComponentEnabled<VoiceActive>(voice, true);
+            state.EntityManager.SetComponentEnabled<StartVoiceRequest>(voice, true);
         }
 
-        private void ApplyVoiceParameters(Entity voice, AudioEvent evt)
+        private void ApplyVoiceParameters(ref SystemState state, Entity voice, AudioEvent evt)
         {
-            ApplyGain(voice, evt.Gain);
-            ApplyPlaybackSpeed(voice, evt.PlaybackSpeed);
-            ResetVoiceAge(voice);
+            ApplyGain(ref state, voice, evt.Gain);
+            ApplyPlaybackSpeed(ref state, voice, evt.PlaybackSpeed);
+            ResetVoiceAge(ref state, voice);
         }
 
         #endregion
 
         #region Voice Parameters
 
-        private void ApplyGain(Entity voice, float gain)
+        private void ApplyGain(ref SystemState state, Entity voice, float gain)
         {
-            var gains = SystemAPI.GetBuffer<OutChannelGain>(voice);
+            var gains = state.EntityManager.GetBuffer<OutChannelGain>(voice);
             for (int k = 0; k < gains.Length; ++k)
             {
                 gains[k] = new OutChannelGain { Value = gain };
             }
         }
 
-        private void ApplyPlaybackSpeed(Entity voice, float playbackSpeed)
+        private void ApplyPlaybackSpeed(ref SystemState state, Entity voice, float playbackSpeed)
         {
-            SystemAPI.SetComponent(voice, new OutPlaybackSpeed { Value = playbackSpeed });
+            state.EntityManager.SetComponentData(voice, new OutPlaybackSpeed { Value = playbackSpeed });
         }
 
-        private readonly void ResetVoiceAge(Entity voice)
+        private void ResetVoiceAge(ref SystemState state, Entity voice)
         {
-            var voiceActive = SystemAPI.GetComponent<VoiceActive>(voice);
+            var voiceActive = state.EntityManager.GetComponentData<VoiceActive>(voice);
             voiceActive.Age = 0;
-            SystemAPI.SetComponent(voice, voiceActive);
+            state.EntityManager.SetComponentData(voice, voiceActive);
         }
 
         #endregion
 
         #region Spatialization
 
-        private void ApplySpatializationSettings(Entity voice, AudioEvent evt)
+        private void ApplySpatializationSettings(ref SystemState state, Entity voice, AudioEvent evt)
         {
             // TODO: Query Per Archetype. This branching is technically not needed. We can use the archetype to determine behavior beforehand.
-            if (SystemAPI.HasComponent<VoiceFollowsEntity>(voice))
+            if (state.EntityManager.HasComponent<VoiceFollowsEntity>(voice))
             {
                 // Attached 3D
-                SystemAPI.SetComponent(voice, new VoiceFollowsEntity { Target = evt.AttachTo });
-                SystemAPI.SetComponent(voice, new VoicePositionOffset { Value = evt.Position });
+                state.EntityManager.SetComponentData(voice, new VoiceFollowsEntity { Target = evt.AttachTo });
+                state.EntityManager.SetComponentData(voice, new VoicePositionOffset { Value = evt.Position });
             }
-            else if (SystemAPI.HasComponent<LocalTransform>(voice))
+            else if (state.EntityManager.HasComponent<LocalTransform>(voice))
             {
                 // World 3D
-                var transform = SystemAPI.GetComponent<LocalTransform>(voice);
+                var transform = state.EntityManager.GetComponentData<LocalTransform>(voice);
                 transform.Position = evt.Position;
-                SystemAPI.SetComponent(voice, transform);
+                state.EntityManager.SetComponentData(voice, transform);
             }
             //else
             //{

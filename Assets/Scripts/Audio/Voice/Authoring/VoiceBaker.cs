@@ -97,6 +97,10 @@ namespace DataOrientedAudio.Voice.Authoring
 
                 AddComponent<StopVoiceRequest>(voiceEntity);
                 SetComponentEnabled<StopVoiceRequest>(voiceEntity, false);
+
+                // 6. Identity & Topology
+                AddComponent(voiceEntity, new VoiceLocalIndex { Value = v });
+                AddComponent(voiceEntity, new VoiceArchetypeIndex { Value = -1 }); // Assigned at runtime
             }
         }
 

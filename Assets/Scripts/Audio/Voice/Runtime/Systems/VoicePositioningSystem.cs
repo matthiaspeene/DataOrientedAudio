@@ -13,7 +13,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     /// <summary>
     /// Updates voice positions to follow target entities with optional offset.
     /// </summary>
-    [UpdateInGroup(typeof(TransformSystemGroup))]
+    [UpdateInGroup(typeof(AudioVoiceUpdateGroup))]
     [BurstCompile]
     public partial struct VoicePositioningSystem : ISystem
     {
