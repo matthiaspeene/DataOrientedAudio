@@ -76,7 +76,7 @@ namespace DataOrientedAudio.Voice.Runtime
         {
             if (!_initialized) return;
             output.Clear();
-            output.AddRange(_commands);
+            output.AddRange(_commands.AsArray());
         }
     }
 }
