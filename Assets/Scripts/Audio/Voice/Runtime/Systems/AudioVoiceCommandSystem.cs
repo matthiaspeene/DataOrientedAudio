@@ -47,7 +47,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             commands.Clear();
 
             // Detect Gain Changes
-            // Detect Gain Changes
             foreach (var (archIdx, localIdx, gain) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<MixGainMod>>()
                          .WithChangeFilter<MixGainMod>())
             {
@@ -60,13 +59,45 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 });
             }
 
-            // 2. Active State Changes
-            // 2. Active State Changes
-            foreach (var (archIdx, localIdx, active) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<VoiceActive>>()
-                         .WithChangeFilter<VoiceActive>())
+            // TODO: Detect Playback Speed Changes
+            /*
+            foreach (var (archIdx, localIdx, speed) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<OutPlaybackSpeed>>()
+                         .WithChangeFilter<OutPlaybackSpeed>())
             {
-                // Placeholder for active state logic
+                commands.Add(new VoiceCommand
+                {
+                    Type = VoiceCommandType.SetPlaybackSpeed,
+                    ArchetypeIndex = archIdx.ValueRO.Value,
+                    LocalVoiceIndex = localIdx.ValueRO.Value,
+                    Value = speed.ValueRO.Value
+                });
             }
+            */
+
+            foreach (var (archIdx, localIdx, start) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<StartVoiceRequest>>()
+                         .WithChangeFilter<StartVoiceRequest>())
+            {
+                commands.Add(new VoiceCommand
+                {
+                    Type = VoiceCommandType.SetActive,
+                    ArchetypeIndex = archIdx.ValueRO.Value,
+                    LocalVoiceIndex = localIdx.ValueRO.Value,
+                    Value = 1.0f
+                });
+            }
+
+            foreach (var (archIdx, localIdx, stop) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<StopVoiceRequest>>()
+                         .WithChangeFilter<StopVoiceRequest>())
+            {
+                commands.Add(new VoiceCommand
+                {
+                    Type = VoiceCommandType.SetActive,
+                    ArchetypeIndex = archIdx.ValueRO.Value,
+                    LocalVoiceIndex = localIdx.ValueRO.Value,
+                    Value = 0.0f
+                });
+            }
+
 
             // Complete dependency so the list is ready for main thread
             this.Dependency.Complete();

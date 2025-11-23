@@ -14,8 +14,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct VoiceAllocationSystem : ISystem
     {
-        #region Voice Allocation
-
         public void OnUpdate(ref SystemState state)
         {
             foreach (var (emitter, eventBuffer) in SystemAPI.Query<RefRW<AudioEventEmitter>, DynamicBuffer<AudioEvent>>())
@@ -45,24 +43,18 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (selectedVoice != Entity.Null)
             {
                 ActivateVoice(ref state, selectedVoice);
-                ApplyVoiceParameters(ref state, selectedVoice, evt);
+                ResetVoiceAge(ref state, selectedVoice);
                 ApplySpatializationSettings(ref state, selectedVoice, evt);
             }
 
             candidates.Dispose();
         }
 
-        #endregion
-
-        #region Voice Selection
-
         private EntityQuery CreateVoiceQuery(ref SystemState state, int voiceTypeHash)
         {
             var query = state.GetEntityQuery(
                 ComponentType.ReadWrite<VoiceActive>(),
                 ComponentType.ReadWrite<StartVoiceRequest>(),
-                ComponentType.ReadWrite<OutChannelGain>(),
-                ComponentType.ReadWrite<OutPlaybackSpeed>(),
                 ComponentType.ReadOnly<VoiceTypeID>()
             );
 
@@ -81,56 +73,24 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 }
             }
 
+            // TODO: Handle voice stealing if no inactive voices are found
             return Entity.Null;
         }
 
-        #endregion
-
-        #region Voice Activation
-
-        private void ActivateVoice(ref SystemState state, Entity voice)
+        private readonly void ActivateVoice(ref SystemState state, Entity voice)
         {
             state.EntityManager.SetComponentEnabled<VoiceActive>(voice, true);
             state.EntityManager.SetComponentEnabled<StartVoiceRequest>(voice, true);
         }
 
-        private void ApplyVoiceParameters(ref SystemState state, Entity voice, AudioEvent evt)
-        {
-            ApplyGain(ref state, voice, evt.Gain);
-            ApplyPlaybackSpeed(ref state, voice, evt.PlaybackSpeed);
-            ResetVoiceAge(ref state, voice);
-        }
-
-        #endregion
-
-        #region Voice Parameters
-
-        private void ApplyGain(ref SystemState state, Entity voice, float gain)
-        {
-            var gains = state.EntityManager.GetBuffer<OutChannelGain>(voice);
-            for (int k = 0; k < gains.Length; ++k)
-            {
-                gains[k] = new OutChannelGain { Value = gain };
-            }
-        }
-
-        private void ApplyPlaybackSpeed(ref SystemState state, Entity voice, float playbackSpeed)
-        {
-            state.EntityManager.SetComponentData(voice, new OutPlaybackSpeed { Value = playbackSpeed });
-        }
-
-        private void ResetVoiceAge(ref SystemState state, Entity voice)
+        private readonly void ResetVoiceAge(ref SystemState state, Entity voice)
         {
             var voiceActive = state.EntityManager.GetComponentData<VoiceActive>(voice);
             voiceActive.Age = 0;
             state.EntityManager.SetComponentData(voice, voiceActive);
         }
 
-        #endregion
-
-        #region Spatialization
-
-        private void ApplySpatializationSettings(ref SystemState state, Entity voice, AudioEvent evt)
+        private readonly void ApplySpatializationSettings(ref SystemState state, Entity voice, AudioEvent evt)
         {
             // TODO: Query Per Archetype. This branching is technically not needed. We can use the archetype to determine behavior beforehand.
             if (state.EntityManager.HasComponent<VoiceFollowsEntity>(voice))
@@ -146,12 +106,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 transform.Position = evt.Position;
                 state.EntityManager.SetComponentData(voice, transform);
             }
-            //else
-            //{
-            //    2D
-            //}
         }
-
-        #endregion
     }
 }
