@@ -14,7 +14,6 @@ namespace DataOrientedAudio.Voice.Runtime
     // Random gain applied once when the voice is spawned.
     public struct RandomGainMod : IComponentData
     {
-        public RandomRange Range;
         public float Result; // Actual random gain chosen within Range.
     }
 
@@ -68,7 +67,6 @@ namespace DataOrientedAudio.Voice.Runtime
 
     public struct RandomPlaybackSpeedMod : IComponentData
     {
-        public RandomRange Range;
         public float Result; // Raw playback speed factor.
     }
 

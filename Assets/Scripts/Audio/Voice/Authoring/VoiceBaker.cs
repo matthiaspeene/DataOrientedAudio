@@ -76,7 +76,7 @@ namespace DataOrientedAudio.Voice.Authoring
 
                 if (voiceData.UseRandomGain)
                 {
-                    AddComponent(voiceEntity, new RandomGainMod { Range = voiceData.GainRange, Result = 1f });
+                    AddComponent(voiceEntity, new RandomGainMod { Result = 1f });
                 }
 
                 // 4. Playback Speed
@@ -85,7 +85,7 @@ namespace DataOrientedAudio.Voice.Authoring
 
                 if (voiceData.UseRandomPitch)
                 {
-                    AddComponent(voiceEntity, new RandomPlaybackSpeedMod { Range = playbackSpeedRange, Result = 0f });
+                    AddComponent(voiceEntity, new RandomPlaybackSpeedMod { Result = 0f });
                 }
 
                 // 5. State
