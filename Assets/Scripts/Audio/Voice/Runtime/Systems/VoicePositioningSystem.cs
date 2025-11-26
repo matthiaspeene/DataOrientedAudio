@@ -13,7 +13,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     /// <summary>
     /// Updates voice positions to follow target entities with optional offset.
     /// </summary>
-    [UpdateInGroup(typeof(AudioVoiceUpdateGroup))]
+    [UpdateInGroup(typeof(AudioVoiceLifecycleGroup))]
     [BurstCompile]
     public partial struct VoicePositioningSystem : ISystem
     {
@@ -21,6 +21,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         public readonly void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<VoiceFollowsEntity>();
+            state.RequireForUpdate<VoiceActive>();
         }
 
         [BurstCompile]
@@ -41,6 +42,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     /// Updates voice transforms to follow target entities.
     /// </summary>
     [BurstCompile]
+    [WithAll(typeof(VoiceActive))]
     public partial struct VoicePositioningJob : IJobEntity
     {
         #region Variables
