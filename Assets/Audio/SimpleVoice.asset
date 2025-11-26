@@ -14,7 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VoiceDataScriptable
   _clips:
   - {fileID: 8300000, guid: a5da8add9783d8443b8c08a21ff686a2, type: 3}
-  _gainRange: {x: 1, y: 1}
-  _pitchRange: {x: 0.1, y: 2}
+  _gainRange:
+    Min: 0
+    Max: 1
+  _pitchRange:
+    Min: 0
+    Max: 0
   _triggermode: 2
   _repeatDelayRange: {x: 0, y: 1}
+  _maxVoices: 16
+  _space: 1
