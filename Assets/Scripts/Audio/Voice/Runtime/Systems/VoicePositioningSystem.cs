@@ -52,9 +52,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         #region Voice Positioning
 
-        /// <summary>
-        /// SIMD-optimized: Uses float3 vector operations.
-        /// </summary>
         private void Execute(
             ref LocalTransform transform,
             in VoiceFollowsEntity follow,

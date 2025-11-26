@@ -1,7 +1,5 @@
 using Unity.Entities;
 using Unity.Collections;
-using Unity.Jobs;
-using Unity.Burst;
 using DataOrientedAudio.Voice.Runtime;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
@@ -9,29 +7,10 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [UpdateInGroup(typeof(AudioVoiceCommandGroup))]
     public partial class AudioVoiceCommandSystem : SystemBase
     {
-        private NativeList<VoiceCommand> _commands;
-
-        // We need to track previous state to detect changes.
-        // We can use IJobChunk or Entities.ForEach with ChangeFilter?
-        // ChangeFilter works for components.
-
-        // For Gain, we have OutChannelGain (buffer) or MixGainMod (component).
-        // The RootOutput expects a single float Gain. Let's assume it's the final calculated gain.
-        // But we don't have a "FinalGain" component yet. 
-        // Let's assume we are tracking `MixGainMod` for now, or we should add a `FinalGain` component 
-        // that the DSP system writes to?
-
-        // The user prompt said: "Detect parameter changes vs previous frame (gain, active, etc.)"
-        // Let's assume we track `MixGainMod` and `VoiceActive`.
-
-        // To detect changes, we can use `IJobEntity` with `ChangeFilter`.
-        // But `ChangeFilter` only tells us *that* it changed, not the previous value.
-        // However, for the command buffer, we just need to send the *new* value if it changed.
-        // The receiver (DSP) will update its state.
+        #region Lifecycle
 
         protected override void OnCreate()
         {
-            // No local list needed, we use the Bridge's write buffer
             EcsAudioBridge.Initialize();
         }
 
@@ -42,26 +21,43 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         protected override void OnUpdate()
         {
-            // Get the shared command list
             var commands = EcsAudioBridge.GetCommandList();
             commands.Clear();
 
-            // Detect Gain Changes
-            foreach (var (archIdx, localIdx, gain) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<MixGainMod>>()
-                         .WithChangeFilter<MixGainMod>())
-            {
-                commands.Add(new VoiceCommand
-                {
-                    Type = VoiceCommandType.SetGain,
-                    ArchetypeIndex = archIdx.ValueRO.Value,
-                    LocalVoiceIndex = localIdx.ValueRO.Value,
-                    Value = gain.ValueRO.Value
-                });
-            }
+            ProcessGainChanges(commands);
+            ProcessPlaybackSpeedChanges(commands);
+            ProcessStartRequests(commands);
+            ProcessStopRequests(commands);
+        }
 
-            // TODO: Detect Playback Speed Changes
-            /*
-            foreach (var (archIdx, localIdx, speed) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<OutPlaybackSpeed>>()
+        #endregion
+
+        #region Command Processing
+
+        private void ProcessGainChanges(NativeList<VoiceCommand> commands)
+        {
+            foreach (var (archIdx, localIdx, gainBuffer) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, DynamicBuffer<OutChannelGain>>()
+                         .WithChangeFilter<OutChannelGain>())
+            {
+                for (int i = 0; i < gainBuffer.Length; i++)
+                {
+                    commands.Add(new VoiceCommand
+                    {
+                        Type = VoiceCommandType.SetGain,
+                        ArchetypeIndex = archIdx.ValueRO.Value,
+                        LocalVoiceIndex = localIdx.ValueRO.Value,
+                        ChannelIndex = i,
+                        Value = gainBuffer[i].Value
+                    });
+                }
+            }
+        }
+
+        private void ProcessPlaybackSpeedChanges(NativeList<VoiceCommand> commands)
+        {
+            foreach (var (archIdx, localIdx, speed) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<OutPlaybackSpeed>>()
                          .WithChangeFilter<OutPlaybackSpeed>())
             {
                 commands.Add(new VoiceCommand
@@ -72,10 +68,12 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                     Value = speed.ValueRO.Value
                 });
             }
-            */
+        }
 
-            foreach (var (archIdx, localIdx, start) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<StartVoiceRequest>>()
-                         .WithChangeFilter<StartVoiceRequest>())
+        private void ProcessStartRequests(NativeList<VoiceCommand> commands)
+        {
+            foreach (var (archIdx, localIdx, startEnabled) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, EnabledRefRW<StartVoiceRequest>>())
             {
                 commands.Add(new VoiceCommand
                 {
@@ -84,10 +82,15 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                     LocalVoiceIndex = localIdx.ValueRO.Value,
                     Value = 1.0f
                 });
-            }
 
-            foreach (var (archIdx, localIdx, stop) in SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, RefRO<StopVoiceRequest>>()
-                         .WithChangeFilter<StopVoiceRequest>())
+                startEnabled.ValueRW = false;
+            }
+        }
+
+        private void ProcessStopRequests(NativeList<VoiceCommand> commands)
+        {
+            foreach (var (archIdx, localIdx, stopEnabled) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, EnabledRefRW<StopVoiceRequest>>())
             {
                 commands.Add(new VoiceCommand
                 {
@@ -96,16 +99,11 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                     LocalVoiceIndex = localIdx.ValueRO.Value,
                     Value = 0.0f
                 });
+
+                stopEnabled.ValueRW = false;
             }
-
-
-            // Complete dependency so the list is ready for main thread
-            this.Dependency.Complete();
         }
 
-        public void ClearCommands()
-        {
-            // Deprecated
-        }
+        #endregion
     }
 }

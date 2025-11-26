@@ -44,9 +44,8 @@ namespace DataOrientedAudio.DSP.RootOutput
     public struct SetVoiceGainMessage
     {
         public int GlobalVoiceIndex;
-        // TODO: In the future this will be a vector of gains to support multi-channel audio.
-        public float GainL;
-        public float GainR;
+        public int ChannelIndex;
+        public float Value;
     }
 
     /// <summary>
@@ -164,8 +163,10 @@ namespace DataOrientedAudio.DSP.RootOutput
                     if ((uint)gainMsg.GlobalVoiceIndex >= (uint)GainsL.Length)
                         continue;
 
-                    GainsL[gainMsg.GlobalVoiceIndex] = gainMsg.GainL;
-                    GainsR[gainMsg.GlobalVoiceIndex] = gainMsg.GainR;
+                    if (gainMsg.ChannelIndex == 0)
+                        GainsL[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
+                    else if (gainMsg.ChannelIndex == 1)
+                        GainsR[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
                 }
 
                 // Voice active flags.
@@ -383,8 +384,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                                     pipe.SendData(context, new SetVoiceGainMessage
                                     {
                                         GlobalVoiceIndex = globalIndex,
-                                        GainL = cmd.Value, // Assuming mono gain applied to both L/R for now
-                                        GainR = cmd.Value,
+                                        ChannelIndex = cmd.ChannelIndex,
+                                        Value = cmd.Value
                                     });
                                     break;
 

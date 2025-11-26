@@ -8,7 +8,7 @@ namespace DataOrientedAudio.Voice.Runtime
     {
         SetGain,
         SetActive,
-        // Add more when needed (e.g., SetPitch, SetPosition)
+        SetPlaybackSpeed
     }
 
     public struct VoiceCommand
@@ -16,6 +16,7 @@ namespace DataOrientedAudio.Voice.Runtime
         public VoiceCommandType Type;
         public int ArchetypeIndex;
         public int LocalVoiceIndex;
+        public int ChannelIndex; // To support multi-channel values. Set to -1 for shared values.
         public float Value;   // Gain or 0/1 for active
     }
 
