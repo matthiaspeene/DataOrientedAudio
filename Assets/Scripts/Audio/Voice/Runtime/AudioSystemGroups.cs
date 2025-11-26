@@ -13,7 +13,7 @@ namespace DataOrientedAudio.Voice.Runtime
     // ─────────────────────────────────────────────
     [UpdateInGroup(typeof(AudioPipelineGroup))]
     public partial class AudioVoiceLifecycleGroup : ComponentSystemGroup { }
-    // Systems: start requests, stop requests, voice pooling, allocation.
+    // Systems: start requests, stop requests, voice pooling, allocation. Updates positions of voices to follow target entities.
 
     // ─────────────────────────────────────────────
     // Stage 2: Update per-voice dynamic parameters
