@@ -395,6 +395,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                                         GlobalVoiceIndex = globalIndex,
                                         IsActive = cmd.Value != 0f,
                                     });
+                                    UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex}");
                                     break;
                             }
                         }
@@ -415,48 +416,12 @@ namespace DataOrientedAudio.DSP.RootOutput
         }
 
         #endregion
-
-        #region Driver MonoBehaviour
-
-        /// <summary>
-        /// Simple driver that allocates and destroys the root output.
-        /// In your project this component lives in a bootstrap scene.
-        /// </summary>
-        [DisallowMultipleComponent]
-        public sealed class Driver : MonoBehaviour
-        {
-            [SerializeField] private int maxArchetypes = 16;
-            [SerializeField] private int totalVoices = 1024;
-
-            private RootOutputInstance _instance;
-
-            private void Start()
-            {
-                // In your real project, replace these with values from ECS bootstrap data.
-                var realtime = new Realtime();
-                var control = new Control(maxArchetypes, totalVoices);
-
-                _instance = ControlContext.builtIn.AllocateRootOutput(realtime, control);
-            }
-
-            private void OnDestroy()
-            {
-                if (_instance != default)
-                {
-                    ControlContext.builtIn.Destroy(_instance);
-                }
-            }
-        }
-
-        #endregion
     }
 
     #region Small NativeArray helpers
 
     internal static class NativeArrayExtensions
     {
-
-
         public static void Fill(this NativeArray<float> array, float value)
         {
             for (int i = 0; i < array.Length; i++)
