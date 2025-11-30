@@ -1,10 +1,6 @@
-// TODO: This system might be replaced by updating the topology onValidate.
-
-using Unity.Entities;
 using Unity.Collections;
-using Unity.Burst;
+using Unity.Entities;
 using DataOrientedAudio.Voice.Runtime;
-using System.Diagnostics;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
 {
@@ -22,24 +18,98 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         protected override void OnCreate()
         {
+            base.OnCreate();
+
             _archetypes = new NativeList<AudioTopologyArchetype>(Allocator.Persistent);
+
+            // Don't let this system start running until at least one baked voice exists.
+            // This effectively waits for the SubScene that contains voices to be loaded.
+            RequireForUpdate<VoiceBlobReference>();
+        }
+
+        protected override void OnStartRunning()
+        {
+            base.OnStartRunning();
+
+            UnityEngine.Debug.Log("[AudioTopologySystem] OnStartRunning – building topology");
+            BuildTopology();
+        }
+
+        protected override void OnUpdate()
+        {
+            // Topology is static for now, nothing to do per frame.
         }
 
         protected override void OnDestroy()
         {
             if (_archetypes.IsCreated)
                 _archetypes.Dispose();
+
+            base.OnDestroy();
         }
 
-        protected override void OnUpdate()
+        #endregion
+
+        #region Public API
+
+        public AudioTopologyData GetTopologyData()
         {
-            if (_isInitialized) return;
+            // In case we're being queried from the audio side before OnStartRunning,
+            // this gives us a second chance to build once entities exist.
+            if (!_isInitialized)
+            {
+                UnityEngine.Debug.Log("[AudioTopologySystem] Lazy topology build from GetTopologyData");
+                BuildTopology();
+            }
+
+            if (!_isInitialized || _archetypes.Length == 0)
+            {
+                UnityEngine.Debug.Log("[AudioTopologySystem] Topology not ready or no archetypes – returning empty");
+                return new AudioTopologyData
+                {
+                    MaxArchetypes = 0,
+                    TotalVoices = 0,
+                    Archetypes = default
+                };
+            }
+
+            var totalVoiceCount = 0;
+            if (_archetypes.Length > 0)
+            {
+                var lastArchetype = _archetypes[_archetypes.Length - 1];
+                totalVoiceCount = lastArchetype.Start + lastArchetype.Count;
+            }
+
+            UnityEngine.Debug.Log($"[AudioTopologySystem] Returning topology with {totalVoiceCount} voices " +
+                                  $"across {_archetypes.Length} archetypes");
+
+            return new AudioTopologyData
+            {
+                MaxArchetypes = _archetypes.Length,
+                TotalVoices = totalVoiceCount,
+                Archetypes = _archetypes.AsArray()
+            };
+        }
+
+        #endregion
+
+        #region Topology Building
+
+        private void BuildTopology()
+        {
+            if (_isInitialized)
+                return;
 
             var query = SystemAPI.QueryBuilder()
                 .WithAll<VoiceBlobReference, VoiceLocalIndex>()
                 .Build();
 
-            if (query.IsEmpty) return;
+            if (query.IsEmpty)
+            {
+                // This can happen if we're called very early by EcsAudioBridge, before subscenes finish loading.
+                UnityEngine.Debug.Log("[AudioTopologySystem] BuildTopology – no voices found yet");
+                return;
+            }
 
             _archetypes.Clear();
 
@@ -51,26 +121,30 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             _isInitialized = true;
 
             DisposeTemporaryCollections(voiceTypeData);
+
+            UnityEngine.Debug.Log($"[AudioTopologySystem] Built topology with {_archetypes.Length} archetypes");
         }
-
-        #endregion
-
-        #region Topology Building
 
         private VoiceTypeData GatherVoiceTypes()
         {
             var uniqueTypes = new NativeHashMap<int, BlobAssetReference<VoiceBlob>>(16, Allocator.Temp);
             var typeCounts = new NativeHashMap<int, int>(16, Allocator.Temp);
 
-            foreach (var (blobRef, entity) in SystemAPI.Query<RefRO<VoiceBlobReference>>().WithAll<VoiceTypeID>().WithEntityAccess())
+            foreach (var (blobRef, entity) in SystemAPI
+                         .Query<RefRO<VoiceBlobReference>>()
+                         .WithAll<VoiceTypeID>()
+                         .WithEntityAccess())
             {
-                var typeID = EntityManager.GetSharedComponent<VoiceTypeID>(entity);
-                if (!uniqueTypes.ContainsKey(typeID.Value))
+                var type = EntityManager.GetSharedComponent<VoiceTypeID>(entity);
+                var typeId = type.Value;
+
+                if (!uniqueTypes.ContainsKey(typeId))
                 {
-                    uniqueTypes.Add(typeID.Value, blobRef.ValueRO.Value);
-                    typeCounts.Add(typeID.Value, 0);
+                    uniqueTypes.Add(typeId, blobRef.ValueRO.Value);
+                    typeCounts.Add(typeId, 0);
                 }
-                typeCounts[typeID.Value]++;
+
+                typeCounts[typeId] = typeCounts[typeId] + 1;
             }
 
             var sortedTypeIds = uniqueTypes.GetKeyArray(Allocator.Temp);
@@ -86,14 +160,14 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void BuildTopologyArchetypes(VoiceTypeData voiceTypeData)
         {
-            int currentStartIndex = 0;
-            int currentArchetypeIndex = 0;
+            var currentStartIndex = 0;
+            var currentArchetypeIndex = 0;
 
-            for (int i = 0; i < voiceTypeData.SortedTypeIds.Length; i++)
+            for (var i = 0; i < voiceTypeData.SortedTypeIds.Length; i++)
             {
-                int typeId = voiceTypeData.SortedTypeIds[i];
+                var typeId = voiceTypeData.SortedTypeIds[i];
                 var voiceBlob = voiceTypeData.UniqueTypes[typeId];
-                int voiceCount = voiceTypeData.TypeCounts[typeId];
+                var voiceCount = voiceTypeData.TypeCounts[typeId];
 
                 _archetypes.Add(new AudioTopologyArchetype
                 {
@@ -110,15 +184,18 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void AssignArchetypeIndices(NativeArray<int> sortedTypeIds)
         {
-            for (int i = 0; i < sortedTypeIds.Length; i++)
+            for (var i = 0; i < sortedTypeIds.Length; i++)
             {
-                int typeId = sortedTypeIds[i];
-                int archetypeIndex = i;
+                var typeId = sortedTypeIds[i];
+                var archetypeIndex = i;
 
-                foreach (var (archIdx, entity) in SystemAPI.Query<RefRW<VoiceArchetypeIndex>>().WithAll<VoiceTypeID>().WithEntityAccess())
+                foreach (var (archIdx, entity) in SystemAPI
+                             .Query<RefRW<VoiceArchetypeIndex>>()
+                             .WithAll<VoiceTypeID>()
+                             .WithEntityAccess())
                 {
-                    var entityTypeID = EntityManager.GetSharedComponent<VoiceTypeID>(entity);
-                    if (entityTypeID.Value == typeId)
+                    var entityTypeId = EntityManager.GetSharedComponent<VoiceTypeID>(entity).Value;
+                    if (entityTypeId == typeId)
                     {
                         archIdx.ValueRW.Value = archetypeIndex;
                     }
@@ -128,7 +205,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void CreateOrUpdateSingleton()
         {
-            int totalVoiceCount = 0;
+            var totalVoiceCount = 0;
             if (_archetypes.Length > 0)
             {
                 var lastArchetype = _archetypes[_archetypes.Length - 1];
@@ -142,11 +219,13 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             };
 
             if (SystemAPI.HasSingleton<AudioTopologySingleton>())
+            {
                 SystemAPI.SetSingleton(singleton);
+            }
             else
             {
-                var singletonEntity = EntityManager.CreateEntity(typeof(AudioTopologySingleton));
-                EntityManager.SetComponentData(singletonEntity, singleton);
+                var entity = EntityManager.CreateEntity(typeof(AudioTopologySingleton));
+                EntityManager.SetComponentData(entity, singleton);
             }
         }
 
@@ -155,32 +234,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             voiceTypeData.SortedTypeIds.Dispose();
             voiceTypeData.UniqueTypes.Dispose();
             voiceTypeData.TypeCounts.Dispose();
-        }
-
-        #endregion
-
-        #region Public API
-
-        public AudioTopologyData GetTopologyData()
-        {
-            if (!_isInitialized && _archetypes.Length == 0)
-            {
-                return new AudioTopologyData();
-            }
-
-            int totalVoiceCount = 0;
-            if (_archetypes.Length > 0)
-            {
-                var lastArchetype = _archetypes[_archetypes.Length - 1];
-                totalVoiceCount = lastArchetype.Start + lastArchetype.Count;
-            }
-
-            return new AudioTopologyData
-            {
-                MaxArchetypes = _archetypes.Length,
-                TotalVoices = totalVoiceCount,
-                Archetypes = _archetypes.AsArray()
-            };
         }
 
         #endregion

@@ -2,14 +2,14 @@ using Unity.Entities;
 using UnityEngine;
 using UnityEngine.Audio;
 using DataOrientedAudio.DSP.RootOutput;
-using static UnityEngine.Audio.ProcessorInstance; // Brings CreationParameters + UpdateSetting into scope
+using DataOrientedAudio.Voice.Runtime.Systems;
+using DataOrientedAudio.Voice.Runtime;
+using static UnityEngine.Audio.ProcessorInstance;
 
+[UpdateInGroup(typeof(InitializationSystemGroup))]
+[UpdateAfter(typeof(AudioTopologySystem))] // Don’t start running until the topology system has created its singleton
 public partial class EcsVoiceRootOutputSystem : SystemBase
 {
-    // You can later pull these from ECS bootstrap/topology, they’re just initial guesses.
-    private const int DefaultMaxArchetypes = 16;
-    private const int DefaultTotalVoices = 1024;
-
     private RootOutputInstance _instance;
     private bool _created;
 
@@ -17,32 +17,46 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
     {
         base.OnCreate();
 
+        RequireForUpdate<AudioTopologySingleton>();
         Debug.Log("[EcsVoiceRootOutputSystem] OnCreate");
+    }
 
-        // Your realtime + control types from EcsVoiceRootOutput
+    protected override void OnStartRunning()
+    {
+        base.OnStartRunning();
+
+        Debug.Log("[EcsVoiceRootOutputSystem] OnStartRunning – creating root output");
+
+        // Get actual topology from AudioTopologySystem
+        var topologySystem = World.GetExistingSystemManaged<AudioTopologySystem>();
+        var topology = topologySystem.GetTopologyData();
+
+        // If for some reason topology is still empty, you can guard here
+        if (topology.MaxArchetypes == 0 || topology.TotalVoices == 0)
+        {
+            Debug.LogWarning("[EcsVoiceRootOutputSystem] Topology is empty, not creating root output yet.");
+            return;
+        }
+
         var realtime = new EcsVoiceRootOutput.Realtime();
-        var control = new EcsVoiceRootOutput.Control(DefaultMaxArchetypes, DefaultTotalVoices);
+        var control = new EcsVoiceRootOutput.Control(topology.MaxArchetypes, topology.TotalVoices);
 
-        // IMPORTANT: Use ProcessorInstance.UpdateSetting, not ControlContext.ProcessorUpdateSetting
         var creationParams = new CreationParameters
         {
-            // Make Control.Update + Realtime.Update run every frame / mix cycle
             controlUpdateSetting = UpdateSetting.UpdateAlways,
             realtimeUpdateSetting = UpdateSetting.UpdateAlways
         };
 
-        // Allocate as a RootOutput using the ref + CreationParameters overload
         _instance = ControlContext.builtIn.AllocateRootOutput(realtime, control, creationParams);
 
-        // RootOutputInstance implicitly converts to ProcessorInstance, so Exists(...) works
         _created = ControlContext.builtIn.Exists(_instance);
-        Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}");
+        Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}, " +
+                  $"Archetypes={topology.MaxArchetypes}, Voices={topology.TotalVoices}");
     }
 
     protected override void OnUpdate()
     {
-        // No per-frame work needed here – audio system drives Control/Realtime.
-        // You can add debug checks or config updates later if you want.
+        // No per-frame work for now
     }
 
     protected override void OnDestroy()
