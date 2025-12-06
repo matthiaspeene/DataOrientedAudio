@@ -140,18 +140,25 @@ namespace DataOrientedAudio.DSP.RootOutput
                 {
                     if (element.TryGetData(out RegisterArchetypeMessage regMsg))
                     {
-                        Debug.Log($"RegisterArchetypeMessage in realtime: {regMsg}");
+                        Debug.Log($"Unhandled RegisterArchetypeMessage in realtime: {regMsg}");
                     }
 
                     if (element.TryGetData(out SetVoiceGainMessage gainMsg))
                     {
-                        Debug.Log($"SetVoiceGainMessage in realtime: {gainMsg}");
-
+                        // TODO: Support multi-channel audio
+                        if (gainMsg.ChannelIndex == 0)
+                        {
+                            GainsL[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
+                        }
+                        else
+                        {
+                            GainsR[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
+                        }
                     }
 
                     if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
                     {
-                        Debug.Log($"SetVoiceActiveMessage in realtime: {activeMsg}");
+                        ActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
                     }
                 }
             }
