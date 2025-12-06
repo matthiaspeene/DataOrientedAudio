@@ -136,48 +136,24 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Update(UpdatedDataContext context, Pipe pipe)
             {
-                // Consume all messages from the control side.
-                // NOTE: In your project you might want to use UpdateIfDataIsAvailable
-                // as the update setting for cheap polling.
-
-                var input = pipe.GetAvailableData(context);
-
-                // Register archetypes / update blob+ranges.
-                // TODO: Fix TryRead - AvailableData does not contain TryRead
-                /*
-                while (input.TryRead(out RegisterArchetypeMessage reg))
+                foreach (var element in pipe.GetAvailableData(context))
                 {
-                    if ((uint)reg.ArchetypeIndex >= (uint)Archetypes.Length)
-                        continue; // Safety guard
+                    if (element.TryGetData(out RegisterArchetypeMessage regMsg))
+                    {
+                        Debug.Log($"RegisterArchetypeMessage in realtime: {regMsg}");
+                    }
 
-                    var meta = Archetypes[reg.ArchetypeIndex];
-                    meta.Blob = reg.Blob;
-                    meta.Start = reg.Start;
-                    meta.Count = reg.Count;
-                    Archetypes[reg.ArchetypeIndex] = meta;
+                    if (element.TryGetData(out SetVoiceGainMessage gainMsg))
+                    {
+                        Debug.Log($"SetVoiceGainMessage in realtime: {gainMsg}");
+
+                    }
+
+                    if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
+                    {
+                        Debug.Log($"SetVoiceActiveMessage in realtime: {activeMsg}");
+                    }
                 }
-
-                // Voice gain updates.
-                while (input.TryRead(out SetVoiceGainMessage gainMsg))
-                {
-                    if ((uint)gainMsg.GlobalVoiceIndex >= (uint)GainsL.Length)
-                        continue;
-
-                    if (gainMsg.ChannelIndex == 0)
-                        GainsL[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
-                    else if (gainMsg.ChannelIndex == 1)
-                        GainsR[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
-                }
-
-                // Voice active flags.
-                while (input.TryRead(out SetVoiceActiveMessage activeMsg))
-                {
-                    if ((uint)activeMsg.GlobalVoiceIndex >= (uint)ActiveFlags.Length)
-                        continue;
-
-                    ActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
-                }
-                */
             }
 
             public JobHandle EarlyProcessing(in RealtimeContext context, Pipe pipe)
@@ -193,6 +169,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 // - For each archetype, run a per-archetype SIMD job that writes into MixBuffer.
                 // - Possibly split by channel layout / mixer targets.
 
+                /*
                 var job = new MixVoicesJob
                 {
                     Archetypes = Archetypes,
@@ -204,10 +181,12 @@ namespace DataOrientedAudio.DSP.RootOutput
                 };
 
                 m_MixJob = job.Schedule(input);
+                */
             }
 
             public void EndProcessing(in RealtimeContext context, Pipe pipe, ChannelBuffer output)
             {
+                /*
                 // Fence on mixing and copy to Unity's output buffer.
                 m_MixJob.Complete();
 
@@ -224,6 +203,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                         output[ch, frame] = temp[ch, frame];
                     }
                 }
+                */
             }
 
             public void RemovedFromProcessing()
@@ -261,11 +241,6 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public JobHandle Configure(ControlContext context, ref Realtime realtime, in AudioFormat format)
             {
-                // 1. Read ECS singleton/state that describes archetype → (blob, start, count).
-                // Note: This runs on the main thread (usually), so we can access managed bridge.
-                // If it runs on a worker thread, we might have issues accessing managed systems.
-                // Assuming Control.Configure runs on Main Thread or has access to World.
-
                 var topology = DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetTopology();
 
                 // If topology is ready, use it. Otherwise fall back or wait.
@@ -279,14 +254,16 @@ namespace DataOrientedAudio.DSP.RootOutput
                 // (Re)allocate native memory on the realtime side.
                 realtime.Format = format;
 
-                // Dispose previous allocations if needed.
-                if (realtime.Archetypes.IsCreated)
+                // Helper to safely reallocate if needed
+                void EnsureArray<T>(ref NativeArray<T> array, int length) where T : struct
                 {
-                    realtime.Archetypes.Dispose();
-                    realtime.GainsL.Dispose();
-                    realtime.GainsR.Dispose();
-                    realtime.ActiveFlags.Dispose();
-                    realtime.MixBuffer.Dispose();
+                    if (array.IsCreated && array.Length == length)
+                        return;
+
+                    if (array.IsCreated)
+                        array.Dispose();
+
+                    array = new NativeArray<T>(length, Allocator.Persistent);
                 }
 
                 if (_maxArchetypes <= 0 || _totalVoices <= 0)
@@ -295,14 +272,14 @@ namespace DataOrientedAudio.DSP.RootOutput
                     _totalVoices = 1;
                 }
 
-                realtime.Archetypes = new NativeArray<ArchetypeMeta>(_maxArchetypes, Allocator.Persistent);
-                realtime.GainsL = new NativeArray<float>(_totalVoices, Allocator.Persistent);
-                realtime.GainsR = new NativeArray<float>(_totalVoices, Allocator.Persistent);
-                realtime.ActiveFlags = new NativeArray<byte>(_totalVoices, Allocator.Persistent);
+                EnsureArray(ref realtime.Archetypes, _maxArchetypes);
+                EnsureArray(ref realtime.GainsL, _totalVoices);
+                EnsureArray(ref realtime.GainsR, _totalVoices);
+                EnsureArray(ref realtime.ActiveFlags, _totalVoices);
 
                 // Mix buffer: one sample per channel per frame.
                 var bufferSamples = format.bufferFrameCount * format.channelCount;
-                realtime.MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
+                EnsureArray(ref realtime.MixBuffer, bufferSamples);
 
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;

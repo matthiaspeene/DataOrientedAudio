@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Audio;
 using DataOrientedAudio.DSP.RootOutput;
@@ -39,6 +40,21 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         }
 
         var realtime = new EcsVoiceRootOutput.Realtime();
+
+        // Pre-allocate arrays to avoid "Jobs can only create Temp memory" error in Configure
+        realtime.Archetypes = new NativeArray<ArchetypeMeta>(topology.MaxArchetypes, Allocator.Persistent);
+        realtime.GainsL = new NativeArray<float>(topology.TotalVoices, Allocator.Persistent);
+        realtime.GainsR = new NativeArray<float>(topology.TotalVoices, Allocator.Persistent);
+        realtime.ActiveFlags = new NativeArray<byte>(topology.TotalVoices, Allocator.Persistent);
+
+        // Estimate buffer size based on AudioSettings
+        var config = AudioSettings.GetConfiguration();
+        int channels = GetChannelCount(config.speakerMode);
+        int bufferLength = config.dspBufferSize;
+        int bufferSamples = bufferLength * channels;
+
+        realtime.MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
+
         var control = new EcsVoiceRootOutput.Control(topology.MaxArchetypes, topology.TotalVoices);
 
         var creationParams = new CreationParameters
@@ -70,5 +86,19 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         }
 
         base.OnDestroy();
+    }
+    private int GetChannelCount(AudioSpeakerMode mode)
+    {
+        switch (mode)
+        {
+            case AudioSpeakerMode.Mono: return 1;
+            case AudioSpeakerMode.Stereo: return 2;
+            case AudioSpeakerMode.Quad: return 4;
+            case AudioSpeakerMode.Surround: return 5;
+            case AudioSpeakerMode.Mode5point1: return 6;
+            case AudioSpeakerMode.Mode7point1: return 8;
+            case AudioSpeakerMode.Prologic: return 2;
+            default: return 2; // Fallback to stereo
+        }
     }
 }
