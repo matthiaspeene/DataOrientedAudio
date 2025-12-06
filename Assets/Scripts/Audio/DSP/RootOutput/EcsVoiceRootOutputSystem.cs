@@ -19,20 +19,16 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         base.OnCreate();
 
         RequireForUpdate<AudioTopologySingleton>();
-        Debug.Log("[EcsVoiceRootOutputSystem] OnCreate");
     }
 
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
 
-        Debug.Log("[EcsVoiceRootOutputSystem] OnStartRunning – creating root output");
-
         // Get actual topology from AudioTopologySystem
         var topologySystem = World.GetExistingSystemManaged<AudioTopologySystem>();
         var topology = topologySystem.GetTopologyData();
 
-        // If for some reason topology is still empty, you can guard here
         if (topology.MaxArchetypes == 0 || topology.TotalVoices == 0)
         {
             Debug.LogWarning("[EcsVoiceRootOutputSystem] Topology is empty, not creating root output yet.");

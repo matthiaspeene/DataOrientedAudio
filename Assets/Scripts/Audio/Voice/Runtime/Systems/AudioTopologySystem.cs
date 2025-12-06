@@ -106,7 +106,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
             if (query.IsEmpty)
             {
-                // This can happen if we're called very early by EcsAudioBridge, before subscenes finish loading.
+                // This can happen if we're called before subscenes finish loading.
                 UnityEngine.Debug.Log("[AudioTopologySystem] BuildTopology – no voices found yet");
                 return;
             }
@@ -121,8 +121,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             _isInitialized = true;
 
             DisposeTemporaryCollections(voiceTypeData);
-
-            UnityEngine.Debug.Log($"[AudioTopologySystem] Built topology with {_archetypes.Length} archetypes");
         }
 
         private VoiceTypeData GatherVoiceTypes()
