@@ -84,7 +84,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 });
 
                 startEnabled.ValueRW = false;
-                UnityEngine.Debug.Log($"Processed start request for local voice: {localIdx.ValueRO.Value}");
             }
         }
 
