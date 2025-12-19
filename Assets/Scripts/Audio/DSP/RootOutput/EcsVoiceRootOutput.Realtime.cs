@@ -23,8 +23,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
 
             // Mixing Data
-            internal NativeArray<float> GainsL;               // length = totalVoices
-            internal NativeArray<float> GainsR;               // length = totalVoices
+            internal NativeArray<float> Gains;                // length = totalVoices * channelCount (interleaved)
 
             // Output Buffer
             internal NativeArray<float> MixBuffer;            // interleaved or planar backing buffer
@@ -47,8 +46,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                 VoiceActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
                 ArchetypeActiveFlags = new NativeArray<byte>(maxArchetypes, Allocator.Persistent);
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
-                GainsL = new NativeArray<float>(totalVoices, Allocator.Persistent);
-                GainsR = new NativeArray<float>(totalVoices, Allocator.Persistent);
 
                 int speakerChannels;
                 switch (speakerMode)
@@ -63,6 +60,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                     default: speakerChannels = 2; break;
                 }
 
+
+
+                Gains = new NativeArray<float>(totalVoices * speakerChannels, Allocator.Persistent);
                 int bufferSamples = dspBufferSize * speakerChannels;
                 MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
                 TempBuffers = new NativeArray<float>(bufferSamples * maxArchetypes, Allocator.Persistent);
@@ -92,14 +92,11 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                     if (element.TryGetData(out SetVoiceGainMessage gainMsg))
                     {
-                        // TODO: Support multi-channel audio
-                        if (gainMsg.ChannelIndex == 0)
+                        // Support multi-channel audio
+                        int channelCount = Format.channelCount;
+                        if (gainMsg.ChannelIndex < channelCount)
                         {
-                            GainsL[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
-                        }
-                        else
-                        {
-                            GainsR[gainMsg.GlobalVoiceIndex] = gainMsg.Value;
+                            Gains[gainMsg.GlobalVoiceIndex * channelCount + gainMsg.ChannelIndex] = gainMsg.Value;
                         }
                     }
 
@@ -149,8 +146,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                         Meta = meta,
                         ActiveFlags = VoiceActiveFlags,
                         PlaybackPositions = PlaybackPositions,
-                        GainsL = GainsL,
-                        GainsR = GainsR,
+                        Gains = Gains.GetSubArray(meta.Start * Format.channelCount, meta.Count * Format.channelCount),
                         OutputBuffer = TempBuffers.GetSubArray(i * bufferLength, bufferLength),
                         Format = Format
                     };
@@ -178,14 +174,13 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 [ReadOnly] public ArchetypeMeta Meta;
                 [ReadOnly] public NativeArray<byte> ActiveFlags;
-                [ReadOnly] public NativeArray<float> GainsL;
-                [ReadOnly] public NativeArray<float> GainsR;
+                [ReadOnly] public NativeSlice<float> Gains;
                 [ReadOnly] public AudioFormat Format;
 
                 [NativeDisableParallelForRestriction]
                 public NativeArray<int> PlaybackPositions;
 
-                public NativeArray<float> OutputBuffer;
+                public NativeSlice<float> OutputBuffer;
 
                 public void Execute()
                 {
@@ -211,8 +206,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                         if (ActiveFlags[globalIndex] == 0) continue;
 
                         int position = PlaybackPositions[globalIndex];
-                        float gainL = GainsL[globalIndex];
-                        float gainR = GainsR[globalIndex];
+                        // Read interleaved gains for this voice
+                        int gainIndexBase = i * outputChannels;
 
                         // Read samples
                         for (int f = 0; f < bufferFrames; f++)
@@ -236,8 +231,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                                 int sampleIndex = position * clipChannels + srcCh;
                                 float sample = samples[sampleIndex];
 
-                                // Apply gain (assuming simple stereo mapping)
-                                float gain = (ch == 0) ? gainL : gainR;
+                                // Apply gain
+                                float gain = Gains[gainIndexBase + ch];
 
                                 OutputBuffer[f * outputChannels + ch] += sample * gain;
                             }

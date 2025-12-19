@@ -58,8 +58,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 realtime.Format = format;
 
                 EnsureArray(ref realtime.Archetypes, _maxArchetypes);
-                EnsureArray(ref realtime.GainsL, _totalVoices);
-                EnsureArray(ref realtime.GainsR, _totalVoices);
+                EnsureArray(ref realtime.Gains, _totalVoices * format.channelCount);
                 EnsureArray(ref realtime.VoiceActiveFlags, _totalVoices);
                 EnsureArray(ref realtime.PlaybackPositions, _totalVoices);
 
@@ -96,14 +95,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                     realtime.Archetypes.Dispose();
                 }
 
-                if (realtime.GainsL.IsCreated)
+                if (realtime.Gains.IsCreated)
                 {
-                    realtime.GainsL.Dispose();
-                }
-
-                if (realtime.GainsR.IsCreated)
-                {
-                    realtime.GainsR.Dispose();
+                    realtime.Gains.Dispose();
                 }
 
                 if (realtime.VoiceActiveFlags.IsCreated)
