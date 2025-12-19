@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Audio;
 using static UnityEngine.Audio.ProcessorInstance;
 using DataOrientedAudio.Voice.Runtime;
+using NUnit.Framework.Internal.Commands;
 
 namespace DataOrientedAudio.DSP.RootOutput
 {
@@ -17,7 +18,8 @@ namespace DataOrientedAudio.DSP.RootOutput
             #region State
 
             internal NativeArray<ArchetypeMeta> Archetypes;   // length = maxArchetypes
-            internal NativeArray<byte> ActiveFlags;           // 0 = inactive, 1 = active
+            internal NativeArray<byte> VoiceActiveFlags;           // 0 = inactive, 1 = active
+            internal NativeArray<byte> ArchetypeActiveFlags;           // 0 = inactive, 1 = active
             internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
 
             // Mixing Data
@@ -35,12 +37,15 @@ namespace DataOrientedAudio.DSP.RootOutput
             JobHandle voicesJobHandle;
             JobHandle mixJobHandle;
 
+            internal NativeArray<JobHandle> Handles;
+
             #endregion
 
             public Realtime(int maxArchetypes, int totalVoices, int dspBufferSize, AudioSpeakerMode speakerMode) : this()
             {
                 Archetypes = new NativeArray<ArchetypeMeta>(maxArchetypes, Allocator.Persistent);
-                ActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
+                VoiceActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
+                ArchetypeActiveFlags = new NativeArray<byte>(maxArchetypes, Allocator.Persistent);
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
                 GainsL = new NativeArray<float>(totalVoices, Allocator.Persistent);
                 GainsR = new NativeArray<float>(totalVoices, Allocator.Persistent);
@@ -61,6 +66,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 int bufferSamples = dspBufferSize * speakerChannels;
                 MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
                 TempBuffers = new NativeArray<float>(bufferSamples * maxArchetypes, Allocator.Persistent);
+                Handles = new NativeArray<JobHandle>(maxArchetypes, Allocator.Persistent);
 
                 Format = new AudioFormat(speakerMode, AudioSettings.outputSampleRate, dspBufferSize);
             }
@@ -99,7 +105,7 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                     if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
                     {
-                        ActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
+                        VoiceActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
                     }
                 }
             }
@@ -113,17 +119,11 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Process(in RealtimeContext context, Pipe pipe, JobHandle input)
             {
-                // Clear MixBuffer
                 MixBuffer.Fill(0);
+                TempBuffers.Fill(0);
 
                 int bufferLength = MixBuffer.Length;
                 int archetypeCount = Archetypes.Length;
-
-                // Clear the pre-allocated temp buffers
-                // Layout: [Archetype0_Samples] [Archetype1_Samples] ...
-                TempBuffers.Fill(0);
-
-                var handles = new NativeList<JobHandle>(archetypeCount, Allocator.Temp);
 
                 // 1. Have each archetype run a per-archetype SIMD job that writes into that archetypes buffer.
                 for (int i = 0; i < archetypeCount; i++)
@@ -132,12 +132,22 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                     // Skip if empty or invalid
                     if (meta.Count == 0 || !meta.Blob.IsCreated)
+                    {
+                        Handles[i] = default;
                         continue;
+                    }
+
+                    // Skip if archetype is not active
+                    if (ArchetypeActiveFlags[i] == 0)
+                    {
+                        Handles[i] = default;
+                        continue;
+                    }
 
                     var job = new ArchetypeVoiceJob
                     {
                         Meta = meta,
-                        ActiveFlags = ActiveFlags,
+                        ActiveFlags = VoiceActiveFlags,
                         PlaybackPositions = PlaybackPositions,
                         GainsL = GainsL,
                         GainsR = GainsR,
@@ -145,11 +155,10 @@ namespace DataOrientedAudio.DSP.RootOutput
                         Format = Format
                     };
 
-                    handles.Add(job.Schedule(input));
+                    Handles[i] = job.Schedule(input);
                 }
 
-                voicesJobHandle = JobHandle.CombineDependencies(handles.AsArray());
-                handles.Dispose();
+                voicesJobHandle = JobHandle.CombineDependencies(Handles);
 
                 // 2. Mix all temp voice buffers into the MixBuffer.
                 var mixJob = new MixJob
@@ -180,9 +189,6 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                 public void Execute()
                 {
-                    // Clear the output buffer for this archetype
-                    OutputBuffer.Fill(0);
-
                     ref var blob = ref Meta.Blob.Value;
                     if (blob.Clips.Length == 0) return;
 

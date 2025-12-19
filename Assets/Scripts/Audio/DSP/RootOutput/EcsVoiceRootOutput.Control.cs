@@ -60,7 +60,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 EnsureArray(ref realtime.Archetypes, _maxArchetypes);
                 EnsureArray(ref realtime.GainsL, _totalVoices);
                 EnsureArray(ref realtime.GainsR, _totalVoices);
-                EnsureArray(ref realtime.ActiveFlags, _totalVoices);
+                EnsureArray(ref realtime.VoiceActiveFlags, _totalVoices);
                 EnsureArray(ref realtime.PlaybackPositions, _totalVoices);
 
                 // Mix buffer: one sample per channel per frame.
@@ -69,6 +69,8 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                 // Temp buffers for archetype mixing: maxArchetypes * bufferSamples
                 EnsureArray(ref realtime.TempBuffers, _maxArchetypes * bufferSamples);
+                EnsureArray(ref realtime.Handles, _maxArchetypes);
+                EnsureArray(ref realtime.ArchetypeActiveFlags, _maxArchetypes);
 
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;
@@ -104,9 +106,14 @@ namespace DataOrientedAudio.DSP.RootOutput
                     realtime.GainsR.Dispose();
                 }
 
-                if (realtime.ActiveFlags.IsCreated)
+                if (realtime.VoiceActiveFlags.IsCreated)
                 {
-                    realtime.ActiveFlags.Dispose();
+                    realtime.VoiceActiveFlags.Dispose();
+                }
+
+                if (realtime.ArchetypeActiveFlags.IsCreated)
+                {
+                    realtime.ArchetypeActiveFlags.Dispose();
                 }
 
                 if (realtime.MixBuffer.IsCreated)
@@ -122,6 +129,11 @@ namespace DataOrientedAudio.DSP.RootOutput
                 if (realtime.TempBuffers.IsCreated)
                 {
                     realtime.TempBuffers.Dispose();
+                }
+
+                if (realtime.Handles.IsCreated)
+                {
+                    realtime.Handles.Dispose();
                 }
             }
 
