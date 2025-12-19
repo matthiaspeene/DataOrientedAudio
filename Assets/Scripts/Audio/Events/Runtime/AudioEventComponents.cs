@@ -10,11 +10,6 @@ namespace DataOrientedAudio.Events.Runtime
     {
         public int VoiceTypeHash;      // Hash of the VoiceData name (replaces Entity VoiceDef)
 
-        public AudioEventSpace Space;  // Stereo2D / World3D / Attached3D
-
-        public float Gain;             // Override gain (1.0 = default)
-        public float PlaybackSpeed;    // Override playback speed (1.0 = default speed)
-
         public float3 Position;        // Used if Space == World3D, Behaves as an offset if Space == Attached3D
         public Entity AttachTo;        // Used if Space == Attached3D
     }
@@ -23,6 +18,5 @@ namespace DataOrientedAudio.Events.Runtime
     public struct AudioEventEmitter : IComponentData
     {
         public Entity DefaultVoiceDef;    // Optional default sound to use
-        public AudioEventSpace DefaultSpace;
     }
 }
