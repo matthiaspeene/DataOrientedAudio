@@ -25,9 +25,10 @@ namespace DataOrientedAudio.DSP.RootOutput
 
     #region Pipe messages
 
+
     /// <summary>
     /// Sent from Control → Realtime when an archetype becomes known
-    /// or its blob/range mapping changes.
+    /// or its blob/range mapping changes. This currently only happens on bootstrap.
     /// </summary>
     public struct RegisterArchetypeMessage
     {
@@ -36,6 +37,7 @@ namespace DataOrientedAudio.DSP.RootOutput
         public int Start;
         public int Count;
     }
+
 
     /// <summary>
     /// Sent from Control → Realtime to update a single voice gain.

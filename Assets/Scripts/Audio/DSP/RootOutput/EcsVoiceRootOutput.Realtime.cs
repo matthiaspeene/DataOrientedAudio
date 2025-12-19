@@ -37,6 +37,34 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             #endregion
 
+            public Realtime(int maxArchetypes, int totalVoices, int dspBufferSize, AudioSpeakerMode speakerMode) : this()
+            {
+                Archetypes = new NativeArray<ArchetypeMeta>(maxArchetypes, Allocator.Persistent);
+                ActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
+                PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
+                GainsL = new NativeArray<float>(totalVoices, Allocator.Persistent);
+                GainsR = new NativeArray<float>(totalVoices, Allocator.Persistent);
+
+                int speakerChannels;
+                switch (speakerMode)
+                {
+                    case AudioSpeakerMode.Mono: speakerChannels = 1; break;
+                    case AudioSpeakerMode.Stereo: speakerChannels = 2; break;
+                    case AudioSpeakerMode.Quad: speakerChannels = 4; break;
+                    case AudioSpeakerMode.Surround: speakerChannels = 5; break;
+                    case AudioSpeakerMode.Mode5point1: speakerChannels = 6; break;
+                    case AudioSpeakerMode.Mode7point1: speakerChannels = 8; break;
+                    case AudioSpeakerMode.Prologic: speakerChannels = 2; break;
+                    default: speakerChannels = 2; break;
+                }
+
+                int bufferSamples = dspBufferSize * speakerChannels;
+                MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
+                TempBuffers = new NativeArray<float>(bufferSamples * maxArchetypes, Allocator.Persistent);
+
+                Format = new AudioFormat(speakerMode, AudioSettings.outputSampleRate, dspBufferSize);
+            }
+
             #region Realtime lifecycle
 
             public void Update(UpdatedDataContext context, Pipe pipe)
