@@ -63,6 +63,11 @@ namespace DataOrientedAudio.DSP.RootOutput
 
 
                 Gains = new NativeArray<float>(totalVoices * speakerChannels, Allocator.Persistent);
+                for (int i = 0; i < Gains.Length; i++)
+                {
+                    Gains[i] = 1f;
+                }
+
                 int bufferSamples = dspBufferSize * speakerChannels;
                 MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
                 TempBuffers = new NativeArray<float>(bufferSamples * maxArchetypes, Allocator.Persistent);
@@ -103,6 +108,29 @@ namespace DataOrientedAudio.DSP.RootOutput
                     if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
                     {
                         VoiceActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
+
+                        if (activeMsg.IsActive)
+                        {
+                            ArchetypeActiveFlags[activeMsg.ArchetypeIndex] = 1;
+                        }
+                        else
+                        {
+                            // Check if all voices in this archetype are inactive
+                            bool allInactive = true;
+                            for (int i = 0; i < Archetypes[activeMsg.ArchetypeIndex].Count; i++)
+                            {
+                                if (VoiceActiveFlags[activeMsg.ArchetypeIndex * Archetypes[activeMsg.ArchetypeIndex].Count + i] == 1)
+                                {
+                                    allInactive = false;
+                                    break;
+                                }
+                            }
+                            if (allInactive)
+                            {
+                                ArchetypeActiveFlags[activeMsg.ArchetypeIndex] = 0;
+                            }
+                        }
+
                     }
                 }
             }
@@ -122,7 +150,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                 int bufferLength = MixBuffer.Length;
                 int archetypeCount = Archetypes.Length;
 
-                // 1. Have each archetype run a per-archetype SIMD job that writes into that archetypes buffer.
                 for (int i = 0; i < archetypeCount; i++)
                 {
                     var meta = Archetypes[i];
@@ -209,6 +236,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                         // Read interleaved gains for this voice
                         int gainIndexBase = i * outputChannels;
 
+                        // Debug
+                        //Debug.Log($"Processing voice {globalIndex} with {outputChannels} channels and {clipChannels} channels and {bufferFrames} frames and {position} position and {clipSampleCount} sample count");
+
                         // Read samples
                         for (int f = 0; f < bufferFrames; f++)
                         {
@@ -255,12 +285,13 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                 public void Execute(int index)
                 {
-                    float sum = 0;
+                    float sum = 0f;
+                    int baseOffset = index;
+
                     for (int i = 0; i < ArchetypeCount; i++)
-                    {
-                        sum += ArchetypeBuffers[i * BufferLength + index];
-                    }
-                    MixBuffer[index] += sum;
+                        sum += ArchetypeBuffers[i * BufferLength + baseOffset];
+
+                    MixBuffer[index] = sum; // you already cleared MixBuffer, so = is fine
                 }
             }
 
@@ -268,17 +299,15 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 mixJobHandle.Complete();
 
-                var temp = new ChannelBuffer(MixBuffer, Format.channelCount);
-
-                // Assumes layout matches.
-                var frameCount = output.frameCount;
-                var channelCount = output.channelCount;
+                int frameCount = output.frameCount;
+                int channelCount = output.channelCount;
 
                 for (int frame = 0; frame < frameCount; frame++)
                 {
+                    int baseIndex = frame * channelCount;
                     for (int ch = 0; ch < channelCount; ch++)
                     {
-                        output[ch, frame] = temp[ch, frame];
+                        output[ch, frame] = MixBuffer[baseIndex + ch];
                     }
                 }
             }

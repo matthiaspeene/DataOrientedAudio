@@ -56,6 +56,7 @@ namespace DataOrientedAudio.DSP.RootOutput
     public struct SetVoiceActiveMessage
     {
         public int GlobalVoiceIndex;
+        public int ArchetypeIndex;
         public bool IsActive;
     }
 
