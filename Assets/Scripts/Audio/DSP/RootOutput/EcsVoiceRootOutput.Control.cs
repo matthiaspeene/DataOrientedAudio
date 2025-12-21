@@ -69,7 +69,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 // Temp buffers for archetype mixing: maxArchetypes * bufferSamples
                 EnsureArray(ref realtime.TempBuffers, _maxArchetypes * bufferSamples);
                 EnsureArray(ref realtime.Handles, _maxArchetypes);
-                EnsureArray(ref realtime.ArchetypeActiveCounts, _maxArchetypes);
+                //EnsureArray(ref realtime.ArchetypeActiveCounts, _maxArchetypes);
 
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;
@@ -105,10 +105,10 @@ namespace DataOrientedAudio.DSP.RootOutput
                     realtime.VoiceActiveFlags.Dispose();
                 }
 
-                if (realtime.ArchetypeActiveCounts.IsCreated)
-                {
-                    realtime.ArchetypeActiveCounts.Dispose();
-                }
+                //if (realtime.ArchetypeActiveCounts.IsCreated)
+                //{
+                //    realtime.ArchetypeActiveCounts.Dispose();
+                //}
 
                 if (realtime.MixBuffer.IsCreated)
                 {

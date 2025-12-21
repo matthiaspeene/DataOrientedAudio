@@ -19,7 +19,8 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             internal NativeArray<ArchetypeMeta> Archetypes;   // length = maxArchetypes
             internal NativeArray<byte> VoiceActiveFlags;           // 0 = inactive, 1 = active
-            internal NativeArray<int> ArchetypeActiveCounts;          // Count of active voices in this archetype
+            //internal NativeArray<int> ArchetypeActiveCounts;          // DEPRECATED: Replaced by ArchetypeActiveVoices
+            internal NativeArray<NativeList<int>> ArchetypeActiveVoices; // List of active global indices per archetype
             internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
 
             // Mixing Data
@@ -44,7 +45,12 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 Archetypes = new NativeArray<ArchetypeMeta>(maxArchetypes, Allocator.Persistent);
                 VoiceActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
-                ArchetypeActiveCounts = new NativeArray<int>(maxArchetypes, Allocator.Persistent);
+                // ArchetypeActiveCounts = new NativeArray<int>(maxArchetypes, Allocator.Persistent);
+                ArchetypeActiveVoices = new NativeArray<NativeList<int>>(maxArchetypes, Allocator.Persistent);
+                for (int i = 0; i < maxArchetypes; i++)
+                {
+                    ArchetypeActiveVoices[i] = new NativeList<int>(Allocator.Persistent);
+                }
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
 
                 int speakerChannels;
@@ -116,11 +122,19 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                             if (activeMsg.IsActive)
                             {
-                                ArchetypeActiveCounts[activeMsg.ArchetypeIndex]++;
+                                ArchetypeActiveVoices[activeMsg.ArchetypeIndex].Add(activeMsg.GlobalVoiceIndex);
                             }
                             else
                             {
-                                ArchetypeActiveCounts[activeMsg.ArchetypeIndex]--;
+                                var list = ArchetypeActiveVoices[activeMsg.ArchetypeIndex];
+                                for (int i = 0; i < list.Length; i++)
+                                {
+                                    if (list[i] == activeMsg.GlobalVoiceIndex)
+                                    {
+                                        list.RemoveAtSwapBack(i);
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -154,7 +168,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                     }
 
                     // Skip if archetype is not active
-                    if (ArchetypeActiveCounts[i] == 0)
+                    // Skip if archetype is not active
+                    if (ArchetypeActiveVoices[i].IsEmpty)
                     {
                         Handles[i] = default;
                         continue;
@@ -163,7 +178,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                     var job = new ArchetypeVoiceJob
                     {
                         Meta = meta,
-                        ActiveFlags = VoiceActiveFlags,
+                        ActiveIndices = ArchetypeActiveVoices[i].AsArray(),
                         PlaybackPositions = PlaybackPositions,
                         Gains = Gains.GetSubArray(meta.Start * Format.channelCount, meta.Count * Format.channelCount),
                         OutputBuffer = TempBuffers.GetSubArray(i * bufferLength, bufferLength),
@@ -192,7 +207,8 @@ namespace DataOrientedAudio.DSP.RootOutput
             struct ArchetypeVoiceJob : IJob
             {
                 [ReadOnly] public ArchetypeMeta Meta;
-                [ReadOnly] public NativeArray<byte> ActiveFlags;
+                [ReadOnly] public NativeArray<int> ActiveIndices;
+                // [ReadOnly] public NativeArray<byte> ActiveFlags; // No longer needed
                 [ReadOnly] public NativeSlice<float> Gains;
                 [ReadOnly] public AudioFormat Format;
 
@@ -216,17 +232,16 @@ namespace DataOrientedAudio.DSP.RootOutput
                     int outputChannels = Format.channelCount;
                     int bufferFrames = OutputBuffer.Length / outputChannels;
 
-                    // Iterate through all voices in this archetype
-                    for (int i = 0; i < Meta.Count; i++)
+                    // Iterate through all active voices in this archetype
+                    for (int i = 0; i < ActiveIndices.Length; i++)
                     {
-                        int globalIndex = Meta.Start + i;
+                        int globalIndex = ActiveIndices[i];
+                        int localIndex = globalIndex - Meta.Start;
 
-                        // Check if voice is active
-                        if (ActiveFlags[globalIndex] == 0) continue;
+                        // Calculate gain index base using local index
+                        int gainIndexBase = localIndex * outputChannels;
 
                         int position = PlaybackPositions[globalIndex];
-                        // Read interleaved gains for this voice
-                        int gainIndexBase = i * outputChannels;
 
                         // Debug
                         //Debug.Log($"Processing voice {globalIndex} with {outputChannels} channels and {clipChannels} channels and {bufferFrames} frames and {position} position and {clipSampleCount} sample count");
@@ -307,6 +322,16 @@ namespace DataOrientedAudio.DSP.RootOutput
             public void RemovedFromProcessing()
             {
                 // Buffers are owned and disposed by the Control side (Dispose / reconfigure).
+                // Dispose internal lists
+                if (ArchetypeActiveVoices.IsCreated)
+                {
+                    for (int i = 0; i < ArchetypeActiveVoices.Length; i++)
+                    {
+                        if (ArchetypeActiveVoices[i].IsCreated)
+                            ArchetypeActiveVoices[i].Dispose();
+                    }
+                    ArchetypeActiveVoices.Dispose();
+                }
             }
 
             #endregion
