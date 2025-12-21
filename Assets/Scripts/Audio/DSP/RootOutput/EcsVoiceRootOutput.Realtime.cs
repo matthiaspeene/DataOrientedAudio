@@ -19,7 +19,7 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             internal NativeArray<ArchetypeMeta> Archetypes;   // length = maxArchetypes
             internal NativeArray<byte> VoiceActiveFlags;           // 0 = inactive, 1 = active
-            internal NativeArray<byte> ArchetypeActiveFlags;           // 0 = inactive, 1 = active
+            internal NativeArray<int> ArchetypeActiveCounts;          // Count of active voices in this archetype
             internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
 
             // Mixing Data
@@ -44,7 +44,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 Archetypes = new NativeArray<ArchetypeMeta>(maxArchetypes, Allocator.Persistent);
                 VoiceActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
-                ArchetypeActiveFlags = new NativeArray<byte>(maxArchetypes, Allocator.Persistent);
+                ArchetypeActiveCounts = new NativeArray<int>(maxArchetypes, Allocator.Persistent);
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
 
                 int speakerChannels;
@@ -107,30 +107,22 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                     if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
                     {
-                        VoiceActiveFlags[activeMsg.GlobalVoiceIndex] = activeMsg.IsActive ? (byte)1 : (byte)0;
+                        byte prevState = VoiceActiveFlags[activeMsg.GlobalVoiceIndex];
+                        byte newState = activeMsg.IsActive ? (byte)1 : (byte)0;
 
-                        if (activeMsg.IsActive)
+                        if (prevState != newState)
                         {
-                            ArchetypeActiveFlags[activeMsg.ArchetypeIndex] = 1;
-                        }
-                        else
-                        {
-                            // Check if all voices in this archetype are inactive
-                            bool allInactive = true;
-                            for (int i = 0; i < Archetypes[activeMsg.ArchetypeIndex].Count; i++)
+                            VoiceActiveFlags[activeMsg.GlobalVoiceIndex] = newState;
+
+                            if (activeMsg.IsActive)
                             {
-                                if (VoiceActiveFlags[activeMsg.ArchetypeIndex * Archetypes[activeMsg.ArchetypeIndex].Count + i] == 1)
-                                {
-                                    allInactive = false;
-                                    break;
-                                }
+                                ArchetypeActiveCounts[activeMsg.ArchetypeIndex]++;
                             }
-                            if (allInactive)
+                            else
                             {
-                                ArchetypeActiveFlags[activeMsg.ArchetypeIndex] = 0;
+                                ArchetypeActiveCounts[activeMsg.ArchetypeIndex]--;
                             }
                         }
-
                     }
                 }
             }
@@ -162,7 +154,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                     }
 
                     // Skip if archetype is not active
-                    if (ArchetypeActiveFlags[i] == 0)
+                    if (ArchetypeActiveCounts[i] == 0)
                     {
                         Handles[i] = default;
                         continue;

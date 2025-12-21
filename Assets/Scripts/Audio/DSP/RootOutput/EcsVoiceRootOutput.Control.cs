@@ -69,7 +69,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 // Temp buffers for archetype mixing: maxArchetypes * bufferSamples
                 EnsureArray(ref realtime.TempBuffers, _maxArchetypes * bufferSamples);
                 EnsureArray(ref realtime.Handles, _maxArchetypes);
-                EnsureArray(ref realtime.ArchetypeActiveFlags, _maxArchetypes);
+                EnsureArray(ref realtime.ArchetypeActiveCounts, _maxArchetypes);
 
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;
@@ -105,9 +105,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                     realtime.VoiceActiveFlags.Dispose();
                 }
 
-                if (realtime.ArchetypeActiveFlags.IsCreated)
+                if (realtime.ArchetypeActiveCounts.IsCreated)
                 {
-                    realtime.ArchetypeActiveFlags.Dispose();
+                    realtime.ArchetypeActiveCounts.Dispose();
                 }
 
                 if (realtime.MixBuffer.IsCreated)
@@ -186,9 +186,10 @@ namespace DataOrientedAudio.DSP.RootOutput
                                     pipe.SendData(context, new SetVoiceActiveMessage
                                     {
                                         GlobalVoiceIndex = globalIndex,
+                                        ArchetypeIndex = cmd.ArchetypeIndex,
                                         IsActive = cmd.Value != 0f,
                                     });
-                                    UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex}");
+                                    UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex} (Archetype: {cmd.ArchetypeIndex})");
                                     break;
                             }
                         }
