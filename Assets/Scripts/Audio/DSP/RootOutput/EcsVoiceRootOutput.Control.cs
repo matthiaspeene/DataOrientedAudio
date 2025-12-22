@@ -214,7 +214,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                                         ArchetypeIndex = cmd.ArchetypeIndex,
                                         IsActive = cmd.Value != 0f,
                                     });
-                                    UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex} (Archetype: {cmd.ArchetypeIndex})");
+                                    //UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex} (Archetype: {cmd.ArchetypeIndex})");
                                     break;
                             }
                         }

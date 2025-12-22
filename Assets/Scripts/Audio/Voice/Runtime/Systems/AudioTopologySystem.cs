@@ -31,7 +31,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         {
             base.OnStartRunning();
 
-            UnityEngine.Debug.Log("[AudioTopologySystem] OnStartRunning – building topology");
+            //UnityEngine.Debug.Log("[AudioTopologySystem] OnStartRunning – building topology");
             BuildTopology();
         }
 
