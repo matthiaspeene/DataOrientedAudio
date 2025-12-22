@@ -168,7 +168,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                     }
 
                     // Skip if archetype is not active
-                    // Skip if archetype is not active
                     if (ArchetypeActiveVoices[i].IsEmpty)
                     {
                         Handles[i] = default;
@@ -243,19 +242,11 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                         int position = PlaybackPositions[globalIndex];
 
-                        // Debug
-                        //Debug.Log($"Processing voice {globalIndex} with {outputChannels} channels and {clipChannels} channels and {bufferFrames} frames and {position} position and {clipSampleCount} sample count");
-
                         // Read samples
                         for (int f = 0; f < bufferFrames; f++)
                         {
-                            // Loop processing. For now, just stop if we hit the end of the clip.
-                            // User said: "We will impliment clip randomization later and what clip to play etc. later."
                             if (position >= clipSampleCount)
                             {
-                                // Simple loop for now to avoid silence? Or stop? 
-                                // "Just play clip one". Usually implies one-shot, but for testing looping is often better.
-                                // I will loop it to ensure constant playback for testing.
                                 position = 0;
                             }
 
