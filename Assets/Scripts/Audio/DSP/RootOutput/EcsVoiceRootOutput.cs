@@ -60,6 +60,14 @@ namespace DataOrientedAudio.DSP.RootOutput
         public bool IsActive;
     }
 
+    /// <summary>
+    /// Sent from Realtime -> Control when a one-shot voice finishes playing.
+    /// </summary>
+    public struct VoiceFinishedMessage
+    {
+        public int GlobalVoiceIndex;
+    }
+
     #endregion
 
     /// <summary>

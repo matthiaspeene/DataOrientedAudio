@@ -14,7 +14,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct VoiceAllocationSystem : ISystem
     {
-        private NativeHashMap<int, NativeList<Entity>> _freeVoices;
+        private NativeHashMap<int, NativeList<Entity>> _freeVoices; // VoiceTypeID -> List of free voices
         private bool _isInitialized;
 
         public void OnCreate(ref SystemState state)
@@ -45,6 +45,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 InitializeFreeVoices(ref state);
                 _isInitialized = true;
             }
+
+            ProcessReclaimedVoices(ref state);
 
             foreach (var (emitter, eventBuffer) in SystemAPI.Query<RefRW<AudioEventEmitter>, DynamicBuffer<AudioEvent>>())
             {
@@ -93,6 +95,26 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             for (int i = 0; i < eventBuffer.Length; i++)
             {
                 AllocateVoice(ref state, eventBuffer[i]);
+            }
+        }
+
+        private void ProcessReclaimedVoices(ref SystemState state)
+        {
+            var reclaimQueue = EcsAudioBridge.GetReclaimQueue();
+
+            while (reclaimQueue.TryDequeue(out Entity entity))
+            {
+                if (!state.EntityManager.Exists(entity)) continue;
+
+                if (state.EntityManager.HasComponent<VoiceTypeID>(entity))
+                {
+                    int typeId = state.EntityManager.GetSharedComponent<VoiceTypeID>(entity).Value;
+
+                    if (_freeVoices.ContainsKey(typeId))
+                    {
+                        _freeVoices[typeId].Add(entity);
+                    }
+                }
             }
         }
 

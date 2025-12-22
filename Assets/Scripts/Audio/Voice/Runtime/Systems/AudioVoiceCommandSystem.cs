@@ -24,10 +24,45 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             var commands = EcsAudioBridge.GetCommandList();
             commands.Clear();
 
+            ProcessFinishedVoices();
+
             ProcessGainChanges(commands);
             ProcessPlaybackSpeedChanges(commands);
             ProcessStartRequests(commands);
             ProcessStopRequests(commands);
+        }
+
+        private void ProcessFinishedVoices()
+        {
+            var finishedVoices = EcsAudioBridge.GetFinishedCommandList();
+
+            if (finishedVoices.Length == 0) return;
+
+            var reclaimQueue = EcsAudioBridge.GetReclaimQueue();
+
+            // Iterate over all active voices to find matches
+            // We use EntityQuery to filter only active voices
+            foreach (var (archIdx, localIdx, entity) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>>()
+                         .WithEntityAccess())
+            {
+                for (int i = 0; i < finishedVoices.Length; i++)
+                {
+                    var cmd = finishedVoices[i];
+
+                    if (cmd.ArchetypeIndex == archIdx.ValueRO.Value && cmd.LocalVoiceIndex == localIdx.ValueRO.Value)
+                    {
+                        // Match found
+                        SystemAPI.SetComponentEnabled<VoiceActive>(entity, false);
+                        SystemAPI.SetComponentEnabled<StopVoiceRequest>(entity, true);
+
+                        // Add to reclaim queue
+                        reclaimQueue.Enqueue(entity);
+                    }
+                }
+            }
+
+            finishedVoices.Clear();
         }
 
         #endregion

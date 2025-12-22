@@ -22,6 +22,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             //internal NativeArray<int> ArchetypeActiveCounts;          // DEPRECATED: Replaced by ArchetypeActiveVoices
             internal NativeArray<NativeList<int>> ArchetypeActiveVoices; // List of active global indices per archetype
             internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
+            internal NativeQueue<int> FinishedVoiceIndices;   // Queue for voices that finished playing
 
             // Mixing Data
             internal NativeArray<float> Gains;                // length = totalVoices * channelCount (interleaved)
@@ -52,6 +53,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                     ArchetypeActiveVoices[i] = new NativeList<int>(Allocator.Persistent);
                 }
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
+                FinishedVoiceIndices = new NativeQueue<int>(Allocator.Persistent);
 
                 int speakerChannels;
                 switch (speakerMode)
@@ -123,6 +125,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                             if (activeMsg.IsActive)
                             {
                                 ArchetypeActiveVoices[activeMsg.ArchetypeIndex].Add(activeMsg.GlobalVoiceIndex);
+                                PlaybackPositions[activeMsg.GlobalVoiceIndex] = 0;
                             }
                             else
                             {
@@ -181,7 +184,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                         PlaybackPositions = PlaybackPositions,
                         Gains = Gains.GetSubArray(meta.Start * Format.channelCount, meta.Count * Format.channelCount),
                         OutputBuffer = TempBuffers.GetSubArray(i * bufferLength, bufferLength),
-                        Format = Format
+                        Format = Format,
+                        FinishedQueue = FinishedVoiceIndices.AsParallelWriter()
                     };
 
                     Handles[i] = job.Schedule(input);
@@ -214,6 +218,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                 [NativeDisableParallelForRestriction]
                 public NativeArray<int> PlaybackPositions;
 
+                [WriteOnly] public NativeQueue<int>.ParallelWriter FinishedQueue; // TBA Check if other paterns are better
+
                 public NativeSlice<float> OutputBuffer;
 
                 public void Execute()
@@ -242,12 +248,25 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                         int position = PlaybackPositions[globalIndex];
 
+                        // Check if already finished
+                        if (position >= clipSampleCount && !blob.Loop)
+                            continue;
+
                         // Read samples
                         for (int f = 0; f < bufferFrames; f++)
                         {
                             if (position >= clipSampleCount)
                             {
-                                position = 0;
+                                if (blob.Loop)
+                                {
+                                    position = 0;
+                                }
+                                else
+                                {
+                                    // Finished
+                                    position = clipSampleCount;
+                                    break;
+                                }
                             }
 
                             for (int ch = 0; ch < outputChannels; ch++)
@@ -269,6 +288,11 @@ namespace DataOrientedAudio.DSP.RootOutput
                         }
 
                         PlaybackPositions[globalIndex] = position;
+
+                        if (position >= clipSampleCount && !blob.Loop)
+                        {
+                            FinishedQueue.Enqueue(globalIndex);
+                        }
                     }
                 }
             }
@@ -308,6 +332,11 @@ namespace DataOrientedAudio.DSP.RootOutput
                         output[ch, frame] = MixBuffer[baseIndex + ch];
                     }
                 }
+
+                while (FinishedVoiceIndices.TryDequeue(out int idx))
+                {
+                    pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
+                }
             }
 
             public void RemovedFromProcessing()
@@ -316,6 +345,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                 // Dispose internal lists
                 if (ArchetypeActiveVoices.IsCreated)
                 {
+                    if (FinishedVoiceIndices.IsCreated) FinishedVoiceIndices.Dispose();
+
                     for (int i = 0; i < ArchetypeActiveVoices.Length; i++)
                     {
                         if (ArchetypeActiveVoices[i].IsCreated)

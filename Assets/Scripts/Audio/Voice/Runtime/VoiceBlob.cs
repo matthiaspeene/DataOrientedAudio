@@ -23,6 +23,7 @@ namespace DataOrientedAudio.Voice.Runtime
     public struct VoiceBlob
     {
         // TODO: This is a placeholder solution to clips. The final version should seperate clip data from voice data so that multiple voices can share the same clip data.
+        public bool Loop;
         public BlobArray<ClipData> Clips; // Array of all clips for random selection
         public float GainMin;             // Minimum gain multiplier
         public float GainMax;             // Maximum gain multiplier

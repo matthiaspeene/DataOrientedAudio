@@ -17,13 +17,23 @@ namespace DataOrientedAudio.Voice.Runtime
             return world.GetExistingSystemManaged<T>();
         }
 
+        public struct VoiceFinishedCommand
+        {
+            public int ArchetypeIndex;
+            public int LocalVoiceIndex;
+        }
+
         private static NativeList<VoiceCommand> _commands;
+        private static NativeList<VoiceFinishedCommand> _finishedCommands;
+        private static NativeQueue<Entity> _reclaimQueue;
         private static bool _initialized;
 
         public static void Initialize()
         {
             if (_initialized) return;
             _commands = new NativeList<VoiceCommand>(Allocator.Persistent);
+            _finishedCommands = new NativeList<VoiceFinishedCommand>(Allocator.Persistent);
+            _reclaimQueue = new NativeQueue<Entity>(Allocator.Persistent);
             _initialized = true;
         }
 
@@ -31,6 +41,8 @@ namespace DataOrientedAudio.Voice.Runtime
         {
             if (!_initialized) return;
             if (_commands.IsCreated) _commands.Dispose();
+            if (_finishedCommands.IsCreated) _finishedCommands.Dispose();
+            if (_reclaimQueue.IsCreated) _reclaimQueue.Dispose();
             _initialized = false;
         }
 
@@ -60,17 +72,30 @@ namespace DataOrientedAudio.Voice.Runtime
             return _commands;
         }
 
+        public static NativeList<VoiceFinishedCommand> GetFinishedCommandList()
+        {
+            if (!_initialized) Initialize();
+            return _finishedCommands;
+        }
+
+        public static NativeQueue<Entity> GetReclaimQueue()
+        {
+            if (!_initialized) Initialize();
+            return _reclaimQueue;
+        }
+
         // Deprecated
         public static NativeList<VoiceCommand> GetVoiceCommands() => GetCommandList();
 
         public static void ClearVoiceCommands()
         {
-            if (_initialized) _commands.Clear();
+            if (_initialized)
+            {
+                _commands.Clear();
+                _finishedCommands.Clear(); // Also clear finished commands? Or should the consumer clear it?
+                // Consumer (AudioVoiceCommandSystem) should clear it after processing.
+            }
         }
-
-        // Removed Double Buffering methods
-        public static NativeList<VoiceCommand> GetWriteList() => GetCommandList();
-        public static void Publish() { }
 
         public static void GetCommands(NativeList<VoiceCommand> output)
         {

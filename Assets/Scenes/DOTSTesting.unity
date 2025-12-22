@@ -299,6 +299,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2102126400
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2102126402}
+  - component: {fileID: 2102126401}
+  m_Layer: 0
+  m_Name: Voice_SimpleVoiceRandomPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2102126401
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2102126400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 736c917c6f6e2054c9284d68180d461c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.Events.Authoring.RandomAudioPlayerAuthoring
+  VoiceData: {fileID: 11400000, guid: e2f1560530cee5640bb69f7cbabb3b1a, type: 2}
+  MinInterval: 0.1
+  MaxInterval: 0.1
+--- !u!4 &2102126402
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2102126400}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.90226, y: 2.11752, z: 2.21884}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2147014047
 GameObject:
   m_ObjectHideFlags: 0
@@ -442,4 +489,5 @@ SceneRoots:
   m_Roots:
   - {fileID: 2147014050}
   - {fileID: 1410708984}
+  - {fileID: 2102126402}
   - {fileID: 1628682052}

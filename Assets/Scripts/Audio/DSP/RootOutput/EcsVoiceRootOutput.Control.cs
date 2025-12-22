@@ -133,6 +133,31 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Update(ControlContext context, Pipe pipe)
             {
+                // Read messages from Realtime
+                foreach (var element in pipe.GetAvailableData(context))
+                {
+                    if (element.TryGetData(out VoiceFinishedMessage finishedMsg))
+                    {
+                        int globalIndex = finishedMsg.GlobalVoiceIndex; // TBA check if we need to optimize our archetype mapping.
+                        if (_topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
+                        {
+                            for (int i = 0; i < _topology.Archetypes.Length; i++)
+                            {
+                                var a = _topology.Archetypes[i];
+                                if (globalIndex >= a.Start && globalIndex < a.Start + a.Count)
+                                {
+                                    DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetFinishedCommandList().Add(new DataOrientedAudio.Voice.Runtime.EcsAudioBridge.VoiceFinishedCommand
+                                    {
+                                        ArchetypeIndex = a.ArchetypeIndex,
+                                        LocalVoiceIndex = globalIndex - a.Start
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 2. For each archetype, if anything changed, send RegisterArchetypeMessage.
                 // We do this once on bootstrap for now.
                 if (!_bootstrapSent && _topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
