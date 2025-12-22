@@ -246,51 +246,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &1533800785
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1533800787}
-  - component: {fileID: 1533800786}
-  m_Layer: 0
-  m_Name: Voice_SimpleVoice
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1533800786
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1533800785}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2df5ef3273d232e459f04387f4abc6f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.Voice.Authoring.VoiceAuthoring
-  VoiceData: {fileID: 11400000, guid: e2f1560530cee5640bb69f7cbabb3b1a, type: 2}
---- !u!4 &1533800787
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1533800785}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13.16376, y: 10.00844, z: 3.91165}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1628682050
 GameObject:
   m_ObjectHideFlags: 0
@@ -487,5 +442,4 @@ SceneRoots:
   m_Roots:
   - {fileID: 2147014050}
   - {fileID: 1410708984}
-  - {fileID: 1533800787}
   - {fileID: 1628682052}
