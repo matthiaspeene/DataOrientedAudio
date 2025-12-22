@@ -1,5 +1,6 @@
 using UnityEngine;
 using DataOrientedAudio.Common;
+using DataOrientedAudio.Busses.Generated;
 
 namespace DataOrientedAudio.Voice.Authoring
 {

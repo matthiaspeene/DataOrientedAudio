@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 495ee7858c35c6c43a1558064a186c0b, type: 3}
+  m_Name: BusGraph
+  m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.Busses.Authoring.BusGraphAsset
+  buses:
+  - name: Master
+    guid: 5777eec5fb7245ce894df00bb60936c1
+    parentGuid: 
+    outGain: 1
+    lpfCutoffHz: 22000
+  - name: Ambience
+    guid: 1f1a80b9fe0941a5b1d3d63022dab511
+    parentGuid: 5777eec5fb7245ce894df00bb60936c1
+    outGain: 1
+    lpfCutoffHz: 22000
+  - name: SFX
+    guid: d9d7d0b5cf8440289a5628d08887bf8f
+    parentGuid: 5777eec5fb7245ce894df00bb60936c1
+    outGain: 1
+    lpfCutoffHz: 22000
+  - name: Player
+    guid: ab08bbdb15ad4483aab00104db275ba6
+    parentGuid: d9d7d0b5cf8440289a5628d08887bf8f
+    outGain: 1
+    lpfCutoffHz: 22000
+  routes: []
