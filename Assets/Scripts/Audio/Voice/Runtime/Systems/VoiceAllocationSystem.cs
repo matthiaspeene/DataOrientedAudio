@@ -14,8 +14,38 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct VoiceAllocationSystem : ISystem
     {
+        private NativeHashMap<int, NativeList<Entity>> _freeVoices;
+        private bool _isInitialized;
+
+        public void OnCreate(ref SystemState state)
+        {
+            _freeVoices = new NativeHashMap<int, NativeList<Entity>>(16, Allocator.Persistent);
+            _isInitialized = false;
+
+            // Wait for voices to be loaded
+            state.RequireForUpdate<VoiceActive>();
+        }
+
+        public void OnDestroy(ref SystemState state)
+        {
+            if (_freeVoices.IsCreated)
+            {
+                foreach (var kvp in _freeVoices)
+                {
+                    kvp.Value.Dispose();
+                }
+                _freeVoices.Dispose();
+            }
+        }
+
         public void OnUpdate(ref SystemState state)
         {
+            if (!_isInitialized)
+            {
+                InitializeFreeVoices(ref state);
+                _isInitialized = true;
+            }
+
             foreach (var (emitter, eventBuffer) in SystemAPI.Query<RefRW<AudioEventEmitter>, DynamicBuffer<AudioEvent>>())
             {
                 if (eventBuffer.IsEmpty)
@@ -26,8 +56,40 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             }
         }
 
+        private void InitializeFreeVoices(ref SystemState state)
+        {
+            var query = state.GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<VoiceActive>(),
+                    ComponentType.ReadOnly<VoiceTypeID>()
+                },
+                Options = EntityQueryOptions.IgnoreComponentEnabledState
+            });
+
+            var entities = query.ToEntityArray(Allocator.Temp);
+
+            for (int i = 0; i < entities.Length; i++)
+            {
+                var entity = entities[i];
+                var typeId = state.EntityManager.GetSharedComponent<VoiceTypeID>(entity).Value;
+
+                if (!_freeVoices.ContainsKey(typeId))
+                {
+                    _freeVoices.Add(typeId, new NativeList<Entity>(Allocator.Persistent));
+                }
+
+                _freeVoices[typeId].Add(entity);
+            }
+
+            entities.Dispose();
+        }
+
+
         private void ProcessAudioEvents(ref SystemState state, DynamicBuffer<AudioEvent> eventBuffer)
         {
+            // UnityEngine.Debug.Log($"VoiceAllocationSystem: Processing {eventBuffer.Length} Audio Events");
             for (int i = 0; i < eventBuffer.Length; i++)
             {
                 AllocateVoice(ref state, eventBuffer[i]);
@@ -36,9 +98,28 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void AllocateVoice(ref SystemState state, AudioEvent evt)
         {
-            EntityQuery query = CreateVoiceQuery(ref state, evt.VoiceTypeHash);
-            NativeArray<Entity> candidates = query.ToEntityArray(Allocator.Temp);
-            Entity selectedVoice = FindInactiveVoice(ref state, candidates);
+            int hash = evt.VoiceTypeHash;
+
+            if (!_freeVoices.ContainsKey(hash))
+            {
+                UnityEngine.Debug.LogWarning($"VoiceAllocationSystem: No voice pool found for hash {hash}");
+                return;
+            }
+
+            NativeList<Entity> pool = _freeVoices[hash];
+
+            if (pool.Length == 0)
+            {
+                UnityEngine.Debug.LogWarning($"VoiceAllocationSystem: No free voices available for hash {hash}");
+                return;
+            }
+
+            // Pop the last entity (efficient)
+            int lastIndex = pool.Length - 1;
+            Entity selectedVoice = pool[lastIndex];
+            pool.RemoveAtSwapBack(lastIndex);
+
+            // UnityEngine.Debug.Log($"VoiceAllocationSystem: Allocated Voice {selectedVoice} for hash {hash}");
 
             if (selectedVoice != Entity.Null)
             {
@@ -46,35 +127,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 ResetVoiceAge(ref state, selectedVoice);
                 ApplySpatializationSettings(ref state, selectedVoice, evt);
             }
-
-            candidates.Dispose();
-        }
-
-        private EntityQuery CreateVoiceQuery(ref SystemState state, int voiceTypeHash)
-        {
-            var query = state.GetEntityQuery(
-                ComponentType.ReadWrite<VoiceActive>(),
-                ComponentType.ReadWrite<StartVoiceRequest>(),
-                ComponentType.ReadOnly<VoiceTypeID>()
-            );
-
-            query.SetSharedComponentFilter(new VoiceTypeID { Value = voiceTypeHash });
-            return query;
-        }
-
-        private Entity FindInactiveVoice(ref SystemState state, NativeArray<Entity> candidates)
-        {
-            // TODO: Maintain a NativeList of free voices per TypeID for better performance
-            foreach (var candidate in candidates)
-            {
-                if (!state.EntityManager.IsComponentEnabled<VoiceActive>(candidate))
-                {
-                    return candidate;
-                }
-            }
-
-            // TODO: Handle voice stealing if no inactive voices are found
-            return Entity.Null;
         }
 
         private readonly void ActivateVoice(ref SystemState state, Entity voice)
