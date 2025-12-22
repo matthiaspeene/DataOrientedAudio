@@ -119,6 +119,8 @@ namespace DataOrientedAudio.Voice.Authoring
             voiceBlob.GainMin = gainRange.Min;
             voiceBlob.GainMax = gainRange.Max;
 
+            voiceBlob.Loop = voiceData.TriggerMode == Triggermode.Loop; // TBA: Add other trigger modes
+
             var playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
             voiceBlob.PlaybackSpeedMin = playbackSpeedRange.Min;
             voiceBlob.PlaybackSpeedMax = playbackSpeedRange.Max;
