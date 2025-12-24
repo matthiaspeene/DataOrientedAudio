@@ -5,70 +5,60 @@ using UnityEngine;
 namespace DataOrientedAudio.Voice.Runtime
 {
     /// <summary>
-    /// MonoBehaviour that syncs a Transform (typically Camera.main) to the ECS AudioListener singleton.
-    /// This creates a bridge between Unity's GameObject/Transform system and the ECS audio listener.
+    /// MonoBehaviour bridge that syncs the Main Camera to the ECS AudioListener singleton.
+    /// Attach this to your Main Camera GameObject (the one with Unity's AudioListener).
+    /// This does NOT need to be baked - it runs as a MonoBehaviour in the main scene.
     /// </summary>
+    [RequireComponent(typeof(Camera))]
     public class AudioListenerSync : MonoBehaviour
     {
-        [SerializeField]
-        [Tooltip("The transform to sync. If null, will use Camera.main on Start.")]
-        private Transform _targetTransform;
-
         private Entity _listenerEntity;
         private EntityManager _entityManager;
-        private EntityQuery _listenerQuery;
         private bool _isInitialized;
 
         private void Start()
         {
-            // Find Camera.main if no explicit transform is assigned
-            // Note: Camera.main is used for convenience and backwards compatibility.
-            // For better performance, explicitly assign a target transform.
-            if (_targetTransform == null)
+            var world = World.DefaultGameObjectInjectionWorld;
+            if (world == null)
             {
-                if (Camera.main != null)
-                {
-                    _targetTransform = Camera.main.transform;
-                }
-                else
-                {
-                    Debug.LogWarning("AudioListenerSync: No target transform assigned and Camera.main is null. AudioListener will not sync.");
-                    return;
-                }
+                Debug.LogWarning("AudioListenerSync: No default world found.");
+                return;
             }
 
-            // Get or create the AudioListener singleton entity
-            _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
-            _listenerQuery = _entityManager.CreateEntityQuery(typeof(AudioListenerTag));
-            CreateOrFindListenerEntity();
+            _entityManager = world.EntityManager;
 
+            // Find or create the singleton entity
+            var query = _entityManager.CreateEntityQuery(typeof(AudioListenerTag));
+
+            if (query.IsEmpty)
+            {
+                // Create singleton
+                _listenerEntity = _entityManager.CreateEntity(
+                    typeof(AudioListenerTag),
+                    typeof(AudioListener));
+
+                _entityManager.SetName(_listenerEntity, "AudioListener");
+            }
+            else
+            {
+                _listenerEntity = query.GetSingletonEntity();
+            }
+
+            query.Dispose();
             _isInitialized = true;
         }
 
-        private void OnDestroy()
+        private void Update() // Use Update, NOT LateUpdate
         {
-            if (_listenerQuery != null)
-            {
-                _listenerQuery.Dispose();
-            }
-        }
-
-        private void LateUpdate()
-        {
-            if (!_isInitialized || _targetTransform == null)
+            if (!_isInitialized || !_entityManager.Exists(_listenerEntity))
                 return;
 
-            // Ensure entity is still valid
-            if (!_entityManager.Exists(_listenerEntity))
-            {
-                CreateOrFindListenerEntity();
-            }
+            var t = transform;
 
-            // Get current listener data
+            // Get previous position for velocity calculation
             var listener = _entityManager.GetComponentData<AudioListener>(_listenerEntity);
 
-            // Calculate velocity from position delta using previous frame's stored position
-            float3 currentPosition = _targetTransform.position;
+            float3 currentPosition = t.position;
             float deltaTime = Time.deltaTime;
 
             if (deltaTime > 0f)
@@ -80,41 +70,23 @@ namespace DataOrientedAudio.Voice.Runtime
                 listener.Velocity = float3.zero;
             }
 
-            // Sync position and rotation data
+            // Update all listener data
             listener.Position = currentPosition;
-            listener.Forward = _targetTransform.forward;
-            listener.Right = _targetTransform.right;
-            listener.Up = _targetTransform.up;
-
-            // Store current position as previous for next frame's velocity calculation
+            listener.Forward = t.forward;
+            listener.Right = t.right;
+            listener.Up = t.up;
             listener.PreviousPosition = currentPosition;
 
-            // Write back to ECS
+            Debug.Log("AudioListenerSync: " + listener.Position);
+
             _entityManager.SetComponentData(_listenerEntity, listener);
         }
 
-        private void CreateOrFindListenerEntity()
+        private void OnDestroy()
         {
-            // Try to find existing listener entity
-            if (_listenerQuery.CalculateEntityCount() > 0)
-            {
-                _listenerEntity = _listenerQuery.GetSingletonEntity();
-            }
-            else
-            {
-                // Create new listener entity
-                _listenerEntity = _entityManager.CreateEntity();
-                _entityManager.AddComponentData(_listenerEntity, new AudioListenerTag());
-                _entityManager.AddComponentData(_listenerEntity, new AudioListener
-                {
-                    Position = float3.zero,
-                    Forward = new float3(0, 0, 1),
-                    Right = new float3(1, 0, 0),
-                    Up = new float3(0, 1, 0),
-                    Velocity = float3.zero,
-                    PreviousPosition = float3.zero
-                });
-            }
+            // Don't destroy the singleton - other systems might need it
+            // Just disconnect this MonoBehaviour
+            _isInitialized = false;
         }
     }
 }

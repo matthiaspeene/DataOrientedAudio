@@ -38,8 +38,21 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             float3 listenerPosition = float3.zero;
             float3 listenerRight = new float3(1, 0, 0);
 
-            // Try to get listener data from singleton
-            if (SystemAPI.TryGetSingleton<AudioListener>(out var listener))
+            bool hasListener = SystemAPI.TryGetSingleton<AudioListener>(out var listener);
+
+            // TEMPORARY DEBUG - Remove BurstCompile attribute to enable this
+#if UNITY_EDITOR
+            if (!hasListener)
+            {
+                UnityEngine.Debug.LogWarning("[SpatializationSystem] No AudioListener singleton found!");
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"[SpatializationSystem] Listener at {listener.Position}, Right={listener.Right}");
+            }
+#endif
+
+            if (hasListener)
             {
                 listenerPosition = listener.Position;
                 listenerRight = listener.Right;

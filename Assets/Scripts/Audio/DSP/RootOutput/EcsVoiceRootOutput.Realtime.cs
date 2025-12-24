@@ -11,6 +11,7 @@ using NUnit.Framework.Internal.Commands;
 
 namespace DataOrientedAudio.DSP.RootOutput
 {
+    [BurstCompile]
     public static partial class EcsVoiceRootOutput
     {
         [BurstCompile(CompileSynchronously = true)]
