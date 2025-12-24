@@ -47,6 +47,14 @@ namespace DataOrientedAudio.Voice.Authoring
                     case AudioEventSpace.World3D:
                         // Add Transform
                         AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
+                        
+                        // Add Spatialization Components
+                        AddComponent<VoiceIsSpatial>(voiceEntity);
+                        SetComponentEnabled<VoiceIsSpatial>(voiceEntity, true);
+                        
+                        var spatialGains = AddBuffer<SpatializationChannelGains>(voiceEntity);
+                        spatialGains.Add(new SpatializationChannelGains { Value = 0.707f }); // Left channel (center pan)
+                        spatialGains.Add(new SpatializationChannelGains { Value = 0.707f }); // Right channel (center pan)
                         break;
 
                     case AudioEventSpace.Attached3D:
@@ -56,6 +64,14 @@ namespace DataOrientedAudio.Voice.Authoring
                         // Add Spatial Components
                         AddComponent(voiceEntity, new VoiceFollowsEntity { Target = Entity.Null });
                         AddComponent(voiceEntity, new VoicePositionOffset { Value = float3.zero });
+                        
+                        // Add Spatialization Components
+                        AddComponent<VoiceIsSpatial>(voiceEntity);
+                        SetComponentEnabled<VoiceIsSpatial>(voiceEntity, true);
+                        
+                        var attachedSpatialGains = AddBuffer<SpatializationChannelGains>(voiceEntity);
+                        attachedSpatialGains.Add(new SpatializationChannelGains { Value = 0.707f }); // Left channel (center pan)
+                        attachedSpatialGains.Add(new SpatializationChannelGains { Value = 0.707f }); // Right channel (center pan)
                         break;
 
                     case AudioEventSpace.Stereo2D:
