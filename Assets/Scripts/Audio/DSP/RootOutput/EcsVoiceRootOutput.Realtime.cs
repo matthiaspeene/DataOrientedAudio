@@ -6,6 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Audio;
 using static UnityEngine.Audio.ProcessorInstance;
+using Unity.Mathematics;
 using DataOrientedAudio.Voice.Runtime;
 using NUnit.Framework.Internal.Commands;
 
@@ -36,6 +37,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             // Voice data
             internal NativeArray<bool> VoiceActiveFlags;
             internal NativeArray<float> Gains; // globalVoiceIndex * channels
+            internal NativeArray<float> PreviousGains; // globalVoiceIndex * channels
             internal NativeArray<float> PlaybackSpeeds;
             internal NativeArray<int> PlaybackPositions;
             internal NativeQueue<int> FinishedVoiceIndices;
@@ -111,10 +113,12 @@ namespace DataOrientedAudio.DSP.RootOutput
                 }
 
                 Gains = new NativeArray<float>(totalVoices * speakerChannels, Allocator.Persistent);
+                PreviousGains = new NativeArray<float>(totalVoices * speakerChannels, Allocator.Persistent);
 
                 for (int i = 0; i < Gains.Length; i++)
                 {
                     Gains[i] = 1f;
+                    PreviousGains[i] = 1f;
                 }
 
                 int bufferSamples = dspBufferSize * speakerChannels;
@@ -163,6 +167,17 @@ namespace DataOrientedAudio.DSP.RootOutput
                         if (oldState == newState) continue;
 
                         VoiceActiveFlags[active.GlobalVoiceIndex] = newState;
+
+                        // If voice is becoming active, initialize previous gains to current (target) gains
+                        // to avoid smoothing from zero/stale values.
+                        if (newState)
+                        {
+                            int baseIdx = active.GlobalVoiceIndex * Format.channelCount;
+                            for (int ch = 0; ch < Format.channelCount; ch++)
+                            {
+                                PreviousGains[baseIdx + ch] = Gains[baseIdx + ch];
+                            }
+                        }
 
                         // Safety check: if the archetype isn't registered yet, we can't determine the bus.
                         // This can happen during startup before the bootstrap message arrives.
@@ -223,6 +238,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                         ActiveVoices = BusActiveVoices[bus].AsArray(),
                         PlaybackPositions = PlaybackPositions,
                         Gains = Gains,
+                        PreviousGains = PreviousGains,
                         Format = Format,
                         OutputBuffer = BusBuffers,
                         FinishedVoices = FinishedVoiceIndices.AsParallelWriter()
@@ -252,6 +268,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 [ReadOnly] public NativeArray<int> ActiveArchetypes;
                 [ReadOnly] public NativeArray<int> ActiveVoices;
                 [ReadOnly] public NativeArray<float> Gains;
+                [NativeDisableContainerSafetyRestriction] public NativeArray<float> PreviousGains;
                 [ReadOnly] public AudioFormat Format;
 
                 [NativeDisableContainerSafetyRestriction] public NativeArray<int> PlaybackPositions;
@@ -317,14 +334,25 @@ namespace DataOrientedAudio.DSP.RootOutput
                             int dstBase = f * channels;
                             int gainBase = global * channels;
 
+                            float t = (float)f / frames;
+
                             for (int ch = 0; ch < channels; ch++)
                             {
+                                int idx = gainBase + ch;
+                                float smoothedGain = math.lerp(PreviousGains[idx], Gains[idx], t);
                                 int srcCh = ch < currentClipChannelCount ? ch : 0;
                                 busBuffer[dstBase + ch] +=
-                                    samples[srcBase + srcCh] * Gains[gainBase + ch];
+                                    samples[srcBase + srcCh] * smoothedGain;
                             }
 
                             pos++;
+                        }
+
+                        // Update previous gains for next block
+                        int voiceGainBase = global * channels;
+                        for (int ch = 0; ch < channels; ch++)
+                        {
+                            PreviousGains[voiceGainBase + ch] = Gains[voiceGainBase + ch];
                         }
 
                         PlaybackPositions[global] = pos;
@@ -396,6 +424,7 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                 if (VoiceActiveFlags.IsCreated) VoiceActiveFlags.Dispose();
                 if (Gains.IsCreated) Gains.Dispose();
+                if (PreviousGains.IsCreated) PreviousGains.Dispose();
                 if (PlaybackSpeeds.IsCreated) PlaybackSpeeds.Dispose();
                 if (PlaybackPositions.IsCreated) PlaybackPositions.Dispose();
                 if (FinishedVoiceIndices.IsCreated) FinishedVoiceIndices.Dispose();
