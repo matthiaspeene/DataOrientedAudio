@@ -65,7 +65,7 @@ namespace DataOrientedAudio.Voice.Runtime
             // Get current listener data
             var listener = _entityManager.GetComponentData<AudioListener>(_listenerEntity);
 
-            // Calculate velocity from position delta
+            // Calculate velocity from position delta using previous frame's stored position
             float3 currentPosition = _targetTransform.position;
             float deltaTime = Time.deltaTime;
             
@@ -83,12 +83,11 @@ namespace DataOrientedAudio.Voice.Runtime
             listener.Forward = _targetTransform.forward;
             listener.Right = _targetTransform.right;
             listener.Up = _targetTransform.up;
+            
+            // Store current position as previous for next frame's velocity calculation
+            listener.PreviousPosition = currentPosition;
 
             // Write back to ECS
-            _entityManager.SetComponentData(_listenerEntity, listener);
-            
-            // Store current position for next frame's velocity calculation
-            listener.PreviousPosition = currentPosition;
             _entityManager.SetComponentData(_listenerEntity, listener);
         }
 
