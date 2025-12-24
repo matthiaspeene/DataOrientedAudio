@@ -96,6 +96,11 @@ namespace DataOrientedAudio.Voice.Runtime
         public Entity Emitter;
     }
 
+    public struct SpatializationChannelGains : IBufferElementData
+    {
+        public float Value;
+    }
+
     #endregion
 
     #region State Components
