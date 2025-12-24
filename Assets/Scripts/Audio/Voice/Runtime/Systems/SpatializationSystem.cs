@@ -17,6 +17,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         // Configuration constants
         private const float MaxPanDistance = 10f;
         private const float MinDistance = 0.1f;
+        private const float CenterPanGain = 0.707f; // Equal-power center pan gain (sqrt(2)/2)
         
         private EntityQuery _listenerQuery;
 
@@ -37,9 +38,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             float3 listenerRight = new float3(1, 0, 0);
             
             // Try to get listener data from singleton
-            if (_listenerQuery.CalculateEntityCount() > 0)
+            if (SystemAPI.TryGetSingleton<AudioListener>(out var listener))
             {
-                var listener = SystemAPI.GetSingleton<AudioListener>();
                 listenerPosition = listener.Position;
                 listenerRight = listener.Right;
             }
@@ -86,8 +86,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (distance < MinDistance)
             {
                 // Voice is very close to listener - center pan
-                gains[0] = new SpatializationChannelGains { Value = 0.707f }; // Left
-                gains[1] = new SpatializationChannelGains { Value = 0.707f }; // Right
+                gains[0] = new SpatializationChannelGains { Value = CenterPanGain }; // Left
+                gains[1] = new SpatializationChannelGains { Value = CenterPanGain }; // Right
                 return;
             }
 

@@ -22,6 +22,8 @@ namespace DataOrientedAudio.Voice.Runtime
         private void Start()
         {
             // Find Camera.main if no explicit transform is assigned
+            // Note: Camera.main is used for convenience and backwards compatibility.
+            // For better performance, explicitly assign a target transform.
             if (_targetTransform == null)
             {
                 if (Camera.main != null)
