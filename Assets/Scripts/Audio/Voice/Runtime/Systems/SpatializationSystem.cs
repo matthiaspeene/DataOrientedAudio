@@ -14,10 +14,19 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct SpatializationSystem : ISystem
     {
+        // Configuration constants
+        private const float MaxPanDistance = 10f;
+        private const float MinDistance = 0.1f;
+        
+        private EntityQuery _listenerQuery;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<VoiceIsSpatial>();
+            
+            // Create listener query once
+            _listenerQuery = SystemAPI.QueryBuilder().WithAll<AudioListenerTag, AudioListener>().Build();
         }
 
         [BurstCompile]
@@ -28,8 +37,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             float3 listenerRight = new float3(1, 0, 0);
             
             // Try to get listener data from singleton
-            var listenerQuery = SystemAPI.QueryBuilder().WithAll<AudioListenerTag, AudioListener>().Build();
-            if (listenerQuery.CalculateEntityCount() > 0)
+            if (_listenerQuery.CalculateEntityCount() > 0)
             {
                 var listener = SystemAPI.GetSingleton<AudioListener>();
                 listenerPosition = listener.Position;
@@ -41,8 +49,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             {
                 ListenerPosition = listenerPosition,
                 ListenerRight = listenerRight,
-                MaxPanDistance = 10f,
-                MinDistance = 0.1f
+                MaxPanDistance = MaxPanDistance,
+                MinDistance = MinDistance
             };
 
             job.ScheduleParallel();

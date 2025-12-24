@@ -16,6 +16,7 @@ namespace DataOrientedAudio.Voice.Runtime
 
         private Entity _listenerEntity;
         private EntityManager _entityManager;
+        private EntityQuery _listenerQuery;
         private bool _isInitialized;
 
         private void Start()
@@ -36,9 +37,18 @@ namespace DataOrientedAudio.Voice.Runtime
 
             // Get or create the AudioListener singleton entity
             _entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+            _listenerQuery = _entityManager.CreateEntityQuery(typeof(AudioListenerTag));
             CreateOrFindListenerEntity();
 
             _isInitialized = true;
+        }
+
+        private void OnDestroy()
+        {
+            if (_listenerQuery.IsCreated)
+            {
+                _listenerQuery.Dispose();
+            }
         }
 
         private void LateUpdate()
@@ -73,19 +83,21 @@ namespace DataOrientedAudio.Voice.Runtime
             listener.Forward = _targetTransform.forward;
             listener.Right = _targetTransform.right;
             listener.Up = _targetTransform.up;
-            listener.PreviousPosition = currentPosition;
 
             // Write back to ECS
+            _entityManager.SetComponentData(_listenerEntity, listener);
+            
+            // Store current position for next frame's velocity calculation
+            listener.PreviousPosition = currentPosition;
             _entityManager.SetComponentData(_listenerEntity, listener);
         }
 
         private void CreateOrFindListenerEntity()
         {
             // Try to find existing listener entity
-            var query = _entityManager.CreateEntityQuery(typeof(AudioListenerTag));
-            if (query.CalculateEntityCount() > 0)
+            if (_listenerQuery.CalculateEntityCount() > 0)
             {
-                _listenerEntity = query.GetSingletonEntity();
+                _listenerEntity = _listenerQuery.GetSingletonEntity();
             }
             else
             {
@@ -102,8 +114,6 @@ namespace DataOrientedAudio.Voice.Runtime
                     PreviousPosition = float3.zero
                 });
             }
-            
-            query.Dispose();
         }
     }
 }
