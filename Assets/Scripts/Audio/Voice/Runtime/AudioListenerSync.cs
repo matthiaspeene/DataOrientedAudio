@@ -47,7 +47,7 @@ namespace DataOrientedAudio.Voice.Runtime
 
         private void OnDestroy()
         {
-            if (_listenerQuery.IsCreated)
+            if (_listenerQuery != null)
             {
                 _listenerQuery.Dispose();
             }
@@ -70,7 +70,7 @@ namespace DataOrientedAudio.Voice.Runtime
             // Calculate velocity from position delta using previous frame's stored position
             float3 currentPosition = _targetTransform.position;
             float deltaTime = Time.deltaTime;
-            
+
             if (deltaTime > 0f)
             {
                 listener.Velocity = (currentPosition - listener.PreviousPosition) / deltaTime;
@@ -85,7 +85,7 @@ namespace DataOrientedAudio.Voice.Runtime
             listener.Forward = _targetTransform.forward;
             listener.Right = _targetTransform.right;
             listener.Up = _targetTransform.up;
-            
+
             // Store current position as previous for next frame's velocity calculation
             listener.PreviousPosition = currentPosition;
 
