@@ -39,8 +39,10 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // SystemAPI.GetSingleton is safe here because of RequireForUpdate<AudioListener>
-            var listener = SystemAPI.GetSingleton<AudioListener>();
+            // SystemAPI.GetSingleton is safe during normal update, but TryGetSingleton is safer during teardown.
+            if (!SystemAPI.TryGetSingleton<AudioListener>(out var listener))
+                return;
+
             float3 listenerPosition = listener.Position;
             float3 listenerRight = listener.Right;
 

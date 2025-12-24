@@ -15,7 +15,7 @@ MonoBehaviour:
   _clips:
   - {fileID: 8300000, guid: a5da8add9783d8443b8c08a21ff686a2, type: 3}
   _gainRange:
-    Min: 1
+    Min: 0
     Max: 1
   _pitchRange:
     Min: 0

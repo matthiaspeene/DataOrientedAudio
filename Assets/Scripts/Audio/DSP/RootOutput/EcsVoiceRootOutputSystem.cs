@@ -7,7 +7,7 @@ using DataOrientedAudio.Voice.Runtime.Systems;
 using DataOrientedAudio.Voice.Runtime;
 using static UnityEngine.Audio.ProcessorInstance;
 
-[UpdateInGroup(typeof(InitializationSystemGroup))]
+[UpdateInGroup(typeof(PresentationSystemGroup))]
 [UpdateAfter(typeof(AudioTopologySystem))] // Don’t start running until the topology system has created its singleton
 public partial class EcsVoiceRootOutputSystem : SystemBase
 {

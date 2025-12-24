@@ -160,96 +160,97 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Update(ControlContext context, Pipe pipe)
             {
-                // Read messages from Realtime
-                foreach (var element in pipe.GetAvailableData(context))
+                // Safety check: if the pipe/context is invalid (teardown), don't process.
+                // Moving the system to PresentationSystemGroup should largely prevent this, 
+                // but we add a try-catch for robustness.
+                try
                 {
-                    if (element.TryGetData(out VoiceFinishedMessage finishedMsg))
+                    // 1. Read messages from Realtime
+                    foreach (var element in pipe.GetAvailableData(context))
                     {
-                        int globalIndex = finishedMsg.GlobalVoiceIndex; // TBA check if we need to optimize our archetype mapping.
-                        if (_topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
+                        if (element.TryGetData(out VoiceFinishedMessage finishedMsg))
                         {
-                            for (int i = 0; i < _topology.Archetypes.Length; i++)
+                            int globalIndex = finishedMsg.GlobalVoiceIndex;
+                            if (_topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
                             {
-                                var a = _topology.Archetypes[i];
-                                if (globalIndex >= a.Start && globalIndex < a.Start + a.Count)
+                                for (int i = 0; i < _topology.Archetypes.Length; i++)
                                 {
-                                    DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetFinishedCommandList().Add(new DataOrientedAudio.Voice.Runtime.EcsAudioBridge.VoiceFinishedCommand
+                                    var a = _topology.Archetypes[i];
+                                    if (globalIndex >= a.Start && globalIndex < a.Start + a.Count)
                                     {
-                                        ArchetypeIndex = a.ArchetypeIndex,
-                                        LocalVoiceIndex = globalIndex - a.Start
-                                    });
-                                    break;
+                                        DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetFinishedCommandList().Add(new DataOrientedAudio.Voice.Runtime.EcsAudioBridge.VoiceFinishedCommand
+                                        {
+                                            ArchetypeIndex = a.ArchetypeIndex,
+                                            LocalVoiceIndex = globalIndex - a.Start
+                                        });
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // 2. For each archetype, if anything changed, send RegisterArchetypeMessage.
-                // We do this once on bootstrap for now.
-                if (!_bootstrapSent && _topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
-                {
-                    for (int i = 0; i < _topology.Archetypes.Length; i++)
+                    // 2. Register archetypes on bootstrap
+                    if (!_bootstrapSent && _topology.MaxArchetypes > 0 && _topology.Archetypes.IsCreated)
                     {
-                        var a = _topology.Archetypes[i];
-                        var msg = new RegisterArchetypeMessage
+                        for (int i = 0; i < _topology.Archetypes.Length; i++)
                         {
-                            ArchetypeIndex = a.ArchetypeIndex,
-                            Blob = a.Blob,
-                            Start = a.Start,
-                            Count = a.Count,
-                        };
-                        pipe.SendData(context, msg);
-                    }
-                    _bootstrapSent = true;
-                }
-
-                // 3. Read ECS audio command buffer with per-voice gain/active changes.
-                // We use a local buffer to copy commands safely from the bridge.
-                var commands = new NativeList<DataOrientedAudio.Voice.Runtime.VoiceCommand>(Allocator.Temp);
-                DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetCommands(commands);
-
-                if (commands.IsCreated && commands.Length > 0)
-                {
-                    for (int i = 0; i < commands.Length; i++)
-                    {
-                        var cmd = commands[i];
-
-                        // Get topology for this archetype to compute global index.
-                        // We need to look up the archetype info.
-                        // We cached _topology.
-                        if (cmd.ArchetypeIndex >= 0 && cmd.ArchetypeIndex < _topology.Archetypes.Length)
-                        {
-                            var topo = _topology.Archetypes[cmd.ArchetypeIndex];
-                            int globalIndex = topo.Start + cmd.LocalVoiceIndex;
-
-                            switch (cmd.Type)
+                            var a = _topology.Archetypes[i];
+                            var msg = new RegisterArchetypeMessage
                             {
-                                case DataOrientedAudio.Voice.Runtime.VoiceCommandType.SetGain:
-                                    pipe.SendData(context, new SetVoiceGainMessage
-                                    {
-                                        GlobalVoiceIndex = globalIndex,
-                                        ChannelIndex = cmd.ChannelIndex,
-                                        Value = cmd.Value
-                                    });
-                                    break;
+                                ArchetypeIndex = a.ArchetypeIndex,
+                                Blob = a.Blob,
+                                Start = a.Start,
+                                Count = a.Count,
+                            };
+                            pipe.SendData(context, msg);
+                        }
+                        _bootstrapSent = true;
+                    }
 
-                                case DataOrientedAudio.Voice.Runtime.VoiceCommandType.SetActive:
-                                    pipe.SendData(context, new SetVoiceActiveMessage
-                                    {
-                                        GlobalVoiceIndex = globalIndex,
-                                        ArchetypeIndex = cmd.ArchetypeIndex,
-                                        IsActive = cmd.Value != 0f,
-                                    });
-                                    //UnityEngine.Debug.Log($"Processed active request for global voice: {globalIndex} (Archetype: {cmd.ArchetypeIndex})");
-                                    break;
+                    // 3. Process commands from ECS
+                    var commands = new NativeList<DataOrientedAudio.Voice.Runtime.VoiceCommand>(Allocator.Temp);
+                    DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetCommands(commands);
+
+                    if (commands.IsCreated && commands.Length > 0)
+                    {
+                        for (int i = 0; i < commands.Length; i++)
+                        {
+                            var cmd = commands[i];
+                            if (cmd.ArchetypeIndex >= 0 && cmd.ArchetypeIndex < _topology.Archetypes.Length)
+                            {
+                                var topo = _topology.Archetypes[cmd.ArchetypeIndex];
+                                int globalIndex = topo.Start + cmd.LocalVoiceIndex;
+
+                                switch (cmd.Type)
+                                {
+                                    case DataOrientedAudio.Voice.Runtime.VoiceCommandType.SetGain:
+                                        pipe.SendData(context, new SetVoiceGainMessage
+                                        {
+                                            GlobalVoiceIndex = globalIndex,
+                                            ChannelIndex = cmd.ChannelIndex,
+                                            Value = cmd.Value
+                                        });
+                                        break;
+
+                                    case DataOrientedAudio.Voice.Runtime.VoiceCommandType.SetActive:
+                                        pipe.SendData(context, new SetVoiceActiveMessage
+                                        {
+                                            GlobalVoiceIndex = globalIndex,
+                                            ArchetypeIndex = cmd.ArchetypeIndex,
+                                            IsActive = cmd.Value != 0f,
+                                        });
+                                        break;
+                                }
                             }
                         }
                     }
-
-                    // No need to clear bridge commands, the swap handled it.
+                    commands.Dispose();
                 }
-                commands.Dispose();
+                catch (System.Exception)
+                {
+                    // Ignore errors during teardown
+                }
             }
 
             public Response OnMessage(ControlContext context, Pipe pipe, Message message)
