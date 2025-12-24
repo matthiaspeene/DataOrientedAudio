@@ -114,6 +114,9 @@ namespace DataOrientedAudio.Voice.Authoring
             using var builder = new BlobBuilder(Allocator.Temp);
             ref VoiceBlob voiceBlob = ref builder.ConstructRoot<VoiceBlob>();
 
+            // Set bus index
+            voiceBlob.OutputBusIndex = voiceData.MixBusIndex;
+
             // Set voice-level parameters
             var gainRange = voiceData.GainRange;
             voiceBlob.GainMin = gainRange.Min;

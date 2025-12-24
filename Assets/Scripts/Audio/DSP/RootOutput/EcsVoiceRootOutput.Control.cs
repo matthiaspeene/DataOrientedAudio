@@ -72,6 +72,17 @@ namespace DataOrientedAudio.DSP.RootOutput
                 EnsureNestedListArray(ref realtime.BusActiveArchetypes, _topology.MaxBuses);
                 EnsureNestedListArray(ref realtime.BusActiveVoices, _topology.MaxBuses);
 
+                // Initialize BusMeta values
+                for (int i = 0; i < _topology.MaxBuses; i++)
+                {
+                    realtime.BusMeta[i] = new BusMeta
+                    {
+                        Start = i * bufferSamples,
+                        Size = bufferSamples,
+                        ChannelCount = format.channelCount
+                    };
+                }
+
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;
 

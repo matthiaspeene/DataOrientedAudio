@@ -2,6 +2,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Entities;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Audio;
 using static UnityEngine.Audio.ProcessorInstance;
@@ -162,7 +163,15 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                         VoiceActiveFlags[active.GlobalVoiceIndex] = newState;
 
-                        int busIndex = Archetypes[active.ArchetypeIndex].Blob.Value.OutputBusIndex;
+                        // Safety check: if the archetype isn't registered yet, we can't determine the bus.
+                        // This can happen during startup before the bootstrap message arrives.
+                        var arch = Archetypes[active.ArchetypeIndex];
+                        if (!arch.Blob.IsCreated)
+                        {
+                            UnityEngine.Debug.LogWarning($"[EcsVoiceRootOutput] Voice activated for archetype {active.ArchetypeIndex} but it's not registered yet. Defaulting to Bus 0.");
+                        }
+
+                        int busIndex = arch.Blob.IsCreated ? arch.Blob.Value.OutputBusIndex : 0;
                         var busVoiceList = BusActiveVoices[busIndex];
                         var busArchetypeList = BusActiveArchetypes[busIndex];
 
@@ -174,13 +183,17 @@ namespace DataOrientedAudio.DSP.RootOutput
                         }
                         else
                         {
-                            busVoiceList.RemoveAtSwapBack(
-                                busVoiceList.IndexOf(active.GlobalVoiceIndex)
-                            );
-                            busArchetypeList.RemoveAtSwapBack(
-                                busArchetypeList.IndexOf(active.ArchetypeIndex)
-                            );
+                            int listIdx = busVoiceList.IndexOf(active.GlobalVoiceIndex);
+                            if (listIdx != -1)
+                            {
+                                busVoiceList.RemoveAtSwapBack(listIdx);
+                                busArchetypeList.RemoveAtSwapBack(listIdx);
+                            }
                         }
+
+                        // Write back modified list structs to the array
+                        BusActiveVoices[busIndex] = busVoiceList;
+                        BusActiveArchetypes[busIndex] = busArchetypeList;
                     }
                 }
             }
@@ -211,7 +224,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                         Gains = Gains,
                         Format = Format,
                         OutputBuffer = BusBuffers,
-                        FinishedVoices = FinishedVoiceIndices
+                        FinishedVoices = FinishedVoiceIndices.AsParallelWriter()
                     };
 
                     BusJobHandles[bus] = job.Schedule(input);
@@ -240,9 +253,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                 [ReadOnly] public NativeArray<float> Gains;
                 [ReadOnly] public AudioFormat Format;
 
-                public NativeArray<int> PlaybackPositions;
-                public NativeArray<float> OutputBuffer;
-                public NativeQueue<int> FinishedVoices;
+                [NativeDisableContainerSafetyRestriction] public NativeArray<int> PlaybackPositions;
+                [NativeDisableContainerSafetyRestriction] public NativeArray<float> OutputBuffer;
+                [NativeDisableContainerSafetyRestriction] public NativeQueue<int>.ParallelWriter FinishedVoices;
 
                 public BusMeta BusMeta;
 
