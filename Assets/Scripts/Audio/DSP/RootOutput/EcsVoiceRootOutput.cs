@@ -58,6 +58,15 @@ namespace DataOrientedAudio.DSP.RootOutput
     }
 
     /// <summary>
+    /// Sent from Control → Realtime to update a single voice playback speed.
+    /// </summary>
+    public struct SetVoicePlaybackSpeedMessage
+    {
+        public int GlobalVoiceIndex;
+        public float Value;
+    }
+
+    /// <summary>
     /// Mark a voice active / inactive.
     /// </summary>
     public struct SetVoiceActiveMessage

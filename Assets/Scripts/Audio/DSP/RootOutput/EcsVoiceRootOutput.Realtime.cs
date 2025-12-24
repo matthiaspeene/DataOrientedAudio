@@ -39,7 +39,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             internal NativeArray<float> Gains; // globalVoiceIndex * channels
             internal NativeArray<float> PreviousGains; // globalVoiceIndex * channels
             internal NativeArray<float> PlaybackSpeeds;
-            internal NativeArray<int> PlaybackPositions;
+            internal NativeArray<float> PlaybackPositions;
             internal NativeQueue<int> FinishedVoiceIndices;
 
             // Job handles
@@ -67,7 +67,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                     };
                 }
 
-                PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
+                PlaybackPositions = new NativeArray<float>(totalVoices, Allocator.Persistent);
                 PlaybackSpeeds = new NativeArray<float>(totalVoices, Allocator.Persistent);
                 for (int i = 0; i < totalVoices; i++) PlaybackSpeeds[i] = 1f;
 
@@ -160,6 +160,11 @@ namespace DataOrientedAudio.DSP.RootOutput
                         Gains[idx] = gain.Value;
                     }
 
+                    if (element.TryGetData(out SetVoicePlaybackSpeedMessage speedMsg))
+                    {
+                        PlaybackSpeeds[speedMsg.GlobalVoiceIndex] = speedMsg.Value;
+                    }
+
                     if (element.TryGetData(out SetVoiceActiveMessage active))
                     {
                         bool newState = active.IsActive;
@@ -195,7 +200,17 @@ namespace DataOrientedAudio.DSP.RootOutput
                         {
                             busVoiceList.Add(active.GlobalVoiceIndex);
                             busArchetypeList.Add(active.ArchetypeIndex);
-                            PlaybackPositions[active.GlobalVoiceIndex] = 0;
+
+                            // Starting position: 0 for forward, end for reverse
+                            float speed = PlaybackSpeeds[active.GlobalVoiceIndex];
+                            if (speed < 0 && arch.Blob.IsCreated && arch.Blob.Value.Clips.Length > 0)
+                            {
+                                PlaybackPositions[active.GlobalVoiceIndex] = arch.Blob.Value.Clips[0].SampleCount - 0.001f;
+                            }
+                            else
+                            {
+                                PlaybackPositions[active.GlobalVoiceIndex] = 0f;
+                            }
                         }
                         else
                         {
@@ -237,6 +252,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                         ActiveArchetypes = BusActiveArchetypes[bus].AsArray(),
                         ActiveVoices = BusActiveVoices[bus].AsArray(),
                         PlaybackPositions = PlaybackPositions,
+                        PlaybackSpeeds = PlaybackSpeeds,
                         Gains = Gains,
                         PreviousGains = PreviousGains,
                         Format = Format,
@@ -271,7 +287,8 @@ namespace DataOrientedAudio.DSP.RootOutput
                 [NativeDisableContainerSafetyRestriction] public NativeArray<float> PreviousGains;
                 [ReadOnly] public AudioFormat Format;
 
-                [NativeDisableContainerSafetyRestriction] public NativeArray<int> PlaybackPositions;
+                [NativeDisableContainerSafetyRestriction] public NativeArray<float> PlaybackSpeeds;
+                [NativeDisableContainerSafetyRestriction] public NativeArray<float> PlaybackPositions;
                 [NativeDisableContainerSafetyRestriction] public NativeArray<float> OutputBuffer;
                 [NativeDisableContainerSafetyRestriction] public NativeQueue<int>.ParallelWriter FinishedVoices;
 
@@ -316,36 +333,53 @@ namespace DataOrientedAudio.DSP.RootOutput
                         if (currentArchetypeIndex == -1) continue;
 
                         ref var samples = ref currentBlob.Value.Clips[0].Samples;
-                        int pos = PlaybackPositions[global];
+                        float pos = PlaybackPositions[global];
+                        float speed = PlaybackSpeeds[global];
+                        bool loop = currentBlob.Value.Loop;
 
                         for (int f = 0; f < frames; f++)
                         {
-                            if (pos >= currentClipSampleCount)
+                            if (pos >= currentClipSampleCount || pos < 0)
                             {
-                                if (!currentBlob.Value.Loop)
+                                if (!loop)
                                 {
                                     FinishedVoices.Enqueue(global);
                                     break;
                                 }
-                                pos = 0;
+                                pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
                             }
 
-                            int srcBase = pos * currentClipChannelCount;
-                            int dstBase = f * channels;
-                            int gainBase = global * channels;
+                            int floorPos = (int)math.floor(pos);
+                            int ceilPos = floorPos + 1;
+                            float frac = pos - floorPos;
 
+                            int gainBase = global * channels;
                             float t = (float)f / frames;
+                            int dstBase = f * channels;
 
                             for (int ch = 0; ch < channels; ch++)
                             {
-                                int idx = gainBase + ch;
-                                float smoothedGain = math.lerp(PreviousGains[idx], Gains[idx], t);
                                 int srcCh = ch < currentClipChannelCount ? ch : 0;
-                                busBuffer[dstBase + ch] +=
-                                    samples[srcBase + srcCh] * smoothedGain;
+
+                                // Linear interpolation for playback speed
+                                float s0 = samples[floorPos * currentClipChannelCount + srcCh];
+                                float s1 = 0f;
+                                if (ceilPos < currentClipSampleCount)
+                                {
+                                    s1 = samples[ceilPos * currentClipChannelCount + srcCh];
+                                }
+                                else if (loop)
+                                {
+                                    s1 = samples[srcCh];
+                                }
+
+                                float sample = math.lerp(s0, s1, frac);
+                                float smoothedGain = math.lerp(PreviousGains[gainBase + ch], Gains[gainBase + ch], t);
+
+                                busBuffer[dstBase + ch] += sample * smoothedGain;
                             }
 
-                            pos++;
+                            pos += speed;
                         }
 
                         // Update previous gains for next block

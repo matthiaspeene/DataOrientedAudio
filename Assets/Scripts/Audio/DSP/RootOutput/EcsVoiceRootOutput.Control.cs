@@ -241,6 +241,14 @@ namespace DataOrientedAudio.DSP.RootOutput
                                             IsActive = cmd.Value != 0f,
                                         });
                                         break;
+
+                                    case DataOrientedAudio.Voice.Runtime.VoiceCommandType.SetPlaybackSpeed:
+                                        pipe.SendData(context, new SetVoicePlaybackSpeedMessage
+                                        {
+                                            GlobalVoiceIndex = globalIndex,
+                                            Value = cmd.Value
+                                        });
+                                        break;
                                 }
                             }
                         }
