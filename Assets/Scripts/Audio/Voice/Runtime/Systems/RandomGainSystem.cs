@@ -15,15 +15,16 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             uint seed = (uint)(SystemAPI.Time.ElapsedTime * 10000.0) + 1;
             var random = new Random(seed);
 
-            foreach (var (randomGain, blobRef) in SystemAPI.Query<RefRW<RandomGainMod>, RefRO<VoiceBlobReference>>()
-                         .WithAll<StartVoiceRequest>())
+            foreach (var (randomGain, entity) in SystemAPI.Query<RefRW<RandomGainMod>>()
+                         .WithEntityAccess()
+                         .WithAll<VoiceRandomGainRange, StartVoiceRequest>())
             {
-                ref var blob = ref blobRef.ValueRO.Value.Value;
+                var range = state.EntityManager.GetSharedComponent<VoiceRandomGainRange>(entity);
 
                 // Advance random state for each entity to avoid identical values in the same frame
                 float t = random.NextFloat();
-                float min = blob.GainMin;
-                float max = blob.GainMax;
+                float min = range.Min;
+                float max = range.Max;
 
                 randomGain.ValueRW.Result = math.lerp(min, max, t);
             }

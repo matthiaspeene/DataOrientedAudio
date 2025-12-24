@@ -122,4 +122,20 @@ namespace DataOrientedAudio.Voice.Runtime
     }
 
     #endregion
+
+    #region Shared Range Components
+
+    public struct VoiceRandomGainRange : ISharedComponentData
+    {
+        public float Min;
+        public float Max;
+    }
+
+    public struct VoiceRandomPlaybackSpeedRange : ISharedComponentData
+    {
+        public float Min;
+        public float Max;
+    }
+
+    #endregion
 }

@@ -15,14 +15,15 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             uint seed = (uint)(SystemAPI.Time.ElapsedTime * 10000.0) + 5678;
             var random = new Random(seed);
 
-            foreach (var (randomSpeed, blobRef) in SystemAPI.Query<RefRW<RandomPlaybackSpeedMod>, RefRO<VoiceBlobReference>>()
-                         .WithAll<StartVoiceRequest>())
+            foreach (var (randomSpeed, entity) in SystemAPI.Query<RefRW<RandomPlaybackSpeedMod>>()
+                         .WithEntityAccess()
+                         .WithAll<VoiceRandomPlaybackSpeedRange, StartVoiceRequest>())
             {
-                ref var blob = ref blobRef.ValueRO.Value.Value;
+                var range = state.EntityManager.GetSharedComponent<VoiceRandomPlaybackSpeedRange>(entity);
 
                 float t = random.NextFloat();
-                float min = blob.PlaybackSpeedMin;
-                float max = blob.PlaybackSpeedMax;
+                float min = range.Min;
+                float max = range.Max;
 
                 randomSpeed.ValueRW.Result = math.lerp(min, max, t);
             }

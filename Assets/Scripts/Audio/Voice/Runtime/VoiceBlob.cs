@@ -26,10 +26,5 @@ namespace DataOrientedAudio.Voice.Runtime
         public BlobArray<ClipData> Clips; // Array of all clips for random selection
         public bool Loop;
         public int OutputBusIndex;
-
-        public float GainMin;             // Minimum gain multiplier
-        public float GainMax;             // Maximum gain multiplier
-        public float PlaybackSpeedMin;    // Minimum playback speed multiplier
-        public float PlaybackSpeedMax;    // Maximum playback speed multiplier
     }
 }

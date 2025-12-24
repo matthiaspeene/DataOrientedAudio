@@ -97,6 +97,11 @@ namespace DataOrientedAudio.Voice.Authoring
                 if (voiceData.UseRandomGain)
                 {
                     AddComponent(voiceEntity, new RandomGainMod { Result = 1f });
+                    AddSharedComponent(voiceEntity, new VoiceRandomGainRange
+                    {
+                        Min = voiceData.GainRange.Min,
+                        Max = voiceData.GainRange.Max
+                    });
                 }
 
                 // 4. Playback Speed
@@ -106,6 +111,11 @@ namespace DataOrientedAudio.Voice.Authoring
                 if (voiceData.UseRandomPitch)
                 {
                     AddComponent(voiceEntity, new RandomPlaybackSpeedMod { Result = 0f });
+                    AddSharedComponent(voiceEntity, new VoiceRandomPlaybackSpeedRange
+                    {
+                        Min = playbackSpeedRange.Min,
+                        Max = playbackSpeedRange.Max
+                    });
                 }
 
                 // 5. State
@@ -138,15 +148,7 @@ namespace DataOrientedAudio.Voice.Authoring
             voiceBlob.OutputBusIndex = voiceData.MixBusIndex;
 
             // Set voice-level parameters
-            var gainRange = voiceData.GainRange;
-            voiceBlob.GainMin = gainRange.Min;
-            voiceBlob.GainMax = gainRange.Max;
-
             voiceBlob.Loop = voiceData.TriggerMode == Triggermode.Loop; // TBA: Add other trigger modes
-
-            var playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
-            voiceBlob.PlaybackSpeedMin = playbackSpeedRange.Min;
-            voiceBlob.PlaybackSpeedMax = playbackSpeedRange.Max;
 
             // Count valid clips
             int validClipCount = 0;
