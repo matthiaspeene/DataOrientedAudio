@@ -89,7 +89,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                 array = new NativeArray<T>(length, Allocator.Persistent);
             }
 
-            public void Dispose(ControlContext context, ref Realtime realtime)
             private void EnsureNestedListArray<T>(ref NativeArray<NativeList<T>> array, int length) where T : unmanaged
             {
                 if (array.IsCreated && array.Length == length)
