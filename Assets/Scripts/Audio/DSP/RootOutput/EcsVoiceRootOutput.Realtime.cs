@@ -17,346 +17,401 @@ namespace DataOrientedAudio.DSP.RootOutput
         {
             #region State
 
-            internal NativeArray<ArchetypeMeta> Archetypes;   // length = maxArchetypes
-            internal NativeArray<byte> VoiceActiveFlags;           // 0 = inactive, 1 = active
-            //internal NativeArray<int> ArchetypeActiveCounts;          // DEPRECATED: Replaced by ArchetypeActiveVoices
-            internal NativeArray<NativeList<int>> ArchetypeActiveVoices; // List of active global indices per archetype
-            internal NativeArray<int> PlaybackPositions;      // Current sample index in clip per voice
-            internal NativeQueue<int> FinishedVoiceIndices;   // Queue for voices that finished playing
-
-            // Mixing Data
-            internal NativeArray<float> Gains;                // length = totalVoices * channelCount (interleaved)
-
-            // Output Buffer
-            internal NativeArray<float> MixBuffer;            // interleaved or planar backing buffer
-            internal NativeArray<float> TempBuffers;          // temp buffer for archetype mixing (maxArchetypes * bufferLength)
-
-            // Config
             internal AudioFormat Format;
+            internal int MaxArchetypes;
+            internal int MaxVoices;
+            internal int MaxBuses;
 
-            // Job Handles
-            JobHandle voicesJobHandle;
+            // Bus data
+            internal NativeArray<BusMeta> BusMeta;
+            internal NativeArray<NativeList<int>> BusActiveArchetypes;
+            internal NativeArray<NativeList<int>> BusActiveVoices;
+            internal NativeArray<float> BusBuffers;
+
+            // Archetype data
+            internal NativeArray<ArchetypeMeta> Archetypes;
+
+            // Voice data
+            internal NativeArray<bool> VoiceActiveFlags;
+            internal NativeArray<float> Gains; // globalVoiceIndex * channels
+            internal NativeArray<float> PlaybackSpeeds;
+            internal NativeArray<int> PlaybackPositions;
+            internal NativeQueue<int> FinishedVoiceIndices;
+
+            // Job handles
+            internal NativeArray<JobHandle> BusJobHandles;
             JobHandle mixJobHandle;
-
-            internal NativeArray<JobHandle> Handles;
 
             #endregion
 
-            public Realtime(int maxArchetypes, int totalVoices, int dspBufferSize, AudioSpeakerMode speakerMode) : this()
+            public Realtime(int maxArchetypes, int totalVoices, int dspBufferSize, AudioSpeakerMode speakerMode, int maxBuses) : this()
             {
+                MaxArchetypes = maxArchetypes;
+                MaxVoices = totalVoices;
+                MaxBuses = maxBuses;
+                Format = new AudioFormat(speakerMode, AudioSettings.outputSampleRate, dspBufferSize);
                 Archetypes = new NativeArray<ArchetypeMeta>(maxArchetypes, Allocator.Persistent);
-                VoiceActiveFlags = new NativeArray<byte>(totalVoices, Allocator.Persistent);
-                // ArchetypeActiveCounts = new NativeArray<int>(maxArchetypes, Allocator.Persistent);
-                ArchetypeActiveVoices = new NativeArray<NativeList<int>>(maxArchetypes, Allocator.Persistent);
-                for (int i = 0; i < maxArchetypes; i++)
+                BusMeta = new NativeArray<BusMeta>(maxBuses, Allocator.Persistent);
+
+                for (int i = 0; i < maxBuses; i++)
                 {
-                    ArchetypeActiveVoices[i] = new NativeList<int>(Allocator.Persistent);
+                    BusMeta[i] = new BusMeta
+                    {
+                        Start = i * dspBufferSize,
+                        Size = dspBufferSize,
+                        ChannelCount = Format.channelCount
+                    };
                 }
+
                 PlaybackPositions = new NativeArray<int>(totalVoices, Allocator.Persistent);
+                PlaybackSpeeds = new NativeArray<float>(totalVoices, Allocator.Persistent);
+                for (int i = 0; i < totalVoices; i++) PlaybackSpeeds[i] = 1f;
+
                 FinishedVoiceIndices = new NativeQueue<int>(Allocator.Persistent);
+                VoiceActiveFlags = new NativeArray<bool>(totalVoices, Allocator.Persistent);
+
+                BusActiveVoices = new NativeArray<NativeList<int>>(maxBuses, Allocator.Persistent);
+                BusActiveArchetypes = new NativeArray<NativeList<int>>(maxBuses, Allocator.Persistent);
+
+                for (int i = 0; i < maxBuses; i++)
+                {
+                    BusActiveVoices[i] = new NativeList<int>(Allocator.Persistent);
+                    BusActiveArchetypes[i] = new NativeList<int>(Allocator.Persistent);
+                }
 
                 int speakerChannels;
                 switch (speakerMode)
                 {
-                    case AudioSpeakerMode.Mono: speakerChannels = 1; break;
-                    case AudioSpeakerMode.Stereo: speakerChannels = 2; break;
-                    case AudioSpeakerMode.Quad: speakerChannels = 4; break;
-                    case AudioSpeakerMode.Surround: speakerChannels = 5; break;
-                    case AudioSpeakerMode.Mode5point1: speakerChannels = 6; break;
-                    case AudioSpeakerMode.Mode7point1: speakerChannels = 8; break;
-                    case AudioSpeakerMode.Prologic: speakerChannels = 2; break;
-                    default: speakerChannels = 2; break;
+                    case AudioSpeakerMode.Mono:
+                        speakerChannels = 1;
+                        break;
+                    case AudioSpeakerMode.Stereo:
+                        speakerChannels = 2;
+                        break;
+                    case AudioSpeakerMode.Quad:
+                        speakerChannels = 4;
+                        break;
+                    case AudioSpeakerMode.Surround:
+                        speakerChannels = 5;
+                        break;
+                    case AudioSpeakerMode.Mode5point1:
+                        speakerChannels = 6;
+                        break;
+                    case AudioSpeakerMode.Mode7point1:
+                        speakerChannels = 8;
+                        break;
+                    case AudioSpeakerMode.Prologic:
+                        speakerChannels = 2;
+                        break;
+                    default:
+                        speakerChannels = 2;
+                        break;
                 }
 
-
-
                 Gains = new NativeArray<float>(totalVoices * speakerChannels, Allocator.Persistent);
+
                 for (int i = 0; i < Gains.Length; i++)
                 {
                     Gains[i] = 1f;
                 }
 
                 int bufferSamples = dspBufferSize * speakerChannels;
-                MixBuffer = new NativeArray<float>(bufferSamples, Allocator.Persistent);
-                TempBuffers = new NativeArray<float>(bufferSamples * maxArchetypes, Allocator.Persistent);
-                Handles = new NativeArray<JobHandle>(maxArchetypes, Allocator.Persistent);
+                BusBuffers = new NativeArray<float>(bufferSamples * maxBuses, Allocator.Persistent);
 
+                for (int i = 0; i < maxBuses; i++)
+                {
+                    BusMeta[i] = new BusMeta
+                    {
+                        Start = i * bufferSamples,
+                        Size = bufferSamples,
+                        ChannelCount = speakerChannels
+                    }; // TODO: Support bus-specific channel counts 
+                }
+
+                BusJobHandles = new NativeArray<JobHandle>(maxBuses, Allocator.Persistent);
                 Format = new AudioFormat(speakerMode, AudioSettings.outputSampleRate, dspBufferSize);
             }
 
-            #region Realtime lifecycle
+            #region Update (messages)
 
             public void Update(UpdatedDataContext context, Pipe pipe)
             {
                 foreach (var element in pipe.GetAvailableData(context))
                 {
-                    if (element.TryGetData(out RegisterArchetypeMessage regMsg))
+                    if (element.TryGetData(out RegisterArchetypeMessage reg))
                     {
-                        if (regMsg.ArchetypeIndex >= 0 && regMsg.ArchetypeIndex < Archetypes.Length)
+                        Archetypes[reg.ArchetypeIndex] = new ArchetypeMeta
                         {
-                            Archetypes[regMsg.ArchetypeIndex] = new ArchetypeMeta
-                            {
-                                Blob = regMsg.Blob,
-                                Start = regMsg.Start,
-                                Count = regMsg.Count
-                            };
-                        }
+                            Blob = reg.Blob,
+                            Start = reg.Start,
+                            Count = reg.Count
+                        };
                     }
 
-                    if (element.TryGetData(out SetVoiceGainMessage gainMsg))
+                    if (element.TryGetData(out SetVoiceGainMessage gain))
                     {
-                        // Support multi-channel audio
-                        int channelCount = Format.channelCount;
-                        if (gainMsg.ChannelIndex < channelCount)
-                        {
-                            Gains[gainMsg.GlobalVoiceIndex * channelCount + gainMsg.ChannelIndex] = gainMsg.Value;
-                        }
+                        int idx = gain.GlobalVoiceIndex * Format.channelCount + gain.ChannelIndex;
+                        Gains[idx] = gain.Value;
                     }
 
-                    if (element.TryGetData(out SetVoiceActiveMessage activeMsg))
+                    if (element.TryGetData(out SetVoiceActiveMessage active))
                     {
-                        byte prevState = VoiceActiveFlags[activeMsg.GlobalVoiceIndex];
-                        byte newState = activeMsg.IsActive ? (byte)1 : (byte)0;
+                        bool newState = active.IsActive;
+                        bool oldState = VoiceActiveFlags[active.GlobalVoiceIndex];
+                        if (oldState == newState) continue;
 
-                        if (prevState != newState)
+                        VoiceActiveFlags[active.GlobalVoiceIndex] = newState;
+
+                        int busIndex = Archetypes[active.ArchetypeIndex].Blob.Value.OutputBusIndex;
+                        var busVoiceList = BusActiveVoices[busIndex];
+                        var busArchetypeList = BusActiveArchetypes[busIndex];
+
+                        if (newState)
                         {
-                            VoiceActiveFlags[activeMsg.GlobalVoiceIndex] = newState;
-
-                            if (activeMsg.IsActive)
-                            {
-                                ArchetypeActiveVoices[activeMsg.ArchetypeIndex].Add(activeMsg.GlobalVoiceIndex);
-                                PlaybackPositions[activeMsg.GlobalVoiceIndex] = 0;
-                            }
-                            else
-                            {
-                                var list = ArchetypeActiveVoices[activeMsg.ArchetypeIndex];
-                                for (int i = 0; i < list.Length; i++)
-                                {
-                                    if (list[i] == activeMsg.GlobalVoiceIndex)
-                                    {
-                                        list.RemoveAtSwapBack(i);
-                                        break;
-                                    }
-                                }
-                            }
+                            busVoiceList.Add(active.GlobalVoiceIndex);
+                            busArchetypeList.Add(active.ArchetypeIndex);
+                            PlaybackPositions[active.GlobalVoiceIndex] = 0;
+                        }
+                        else
+                        {
+                            busVoiceList.RemoveAtSwapBack(
+                                busVoiceList.IndexOf(active.GlobalVoiceIndex)
+                            );
+                            busArchetypeList.RemoveAtSwapBack(
+                                busArchetypeList.IndexOf(active.ArchetypeIndex)
+                            );
                         }
                     }
                 }
             }
 
-            public JobHandle EarlyProcessing(in RealtimeContext context, Pipe pipe)
-            {
-                // Not used in this sketch, but this is another place where you
-                // could read messages if you wanted them as close to Process as possible.
-                return default;
-            }
+            #endregion
+
+            #region Process
 
             public void Process(in RealtimeContext context, Pipe pipe, JobHandle input)
             {
-                MixBuffer.Fill(0);
-                TempBuffers.Fill(0);
+                BusBuffers.Fill(0f);
 
-                int bufferLength = MixBuffer.Length;
-                int archetypeCount = Archetypes.Length;
-
-                for (int i = 0; i < archetypeCount; i++)
+                for (int bus = 0; bus < BusMeta.Length; bus++)
                 {
-                    var meta = Archetypes[i];
-
-                    // Skip if empty or invalid
-                    if (meta.Count == 0 || !meta.Blob.IsCreated)
+                    if (BusActiveArchetypes[bus].IsEmpty)
                     {
-                        Handles[i] = default;
+                        BusJobHandles[bus] = default;
                         continue;
                     }
 
-                    // Skip if archetype is not active
-                    if (ArchetypeActiveVoices[i].IsEmpty)
+                    var job = new BusMixJob
                     {
-                        Handles[i] = default;
-                        continue;
-                    }
-
-                    var job = new ArchetypeVoiceJob
-                    {
-                        Meta = meta,
-                        ActiveIndices = ArchetypeActiveVoices[i].AsArray(),
+                        BusMeta = BusMeta[bus],
+                        Archetypes = Archetypes,
+                        ActiveArchetypes = BusActiveArchetypes[bus].AsArray(),
+                        ActiveVoices = BusActiveVoices[bus].AsArray(),
                         PlaybackPositions = PlaybackPositions,
-                        Gains = Gains.GetSubArray(meta.Start * Format.channelCount, meta.Count * Format.channelCount),
-                        OutputBuffer = TempBuffers.GetSubArray(i * bufferLength, bufferLength),
+                        Gains = Gains,
                         Format = Format,
-                        FinishedQueue = FinishedVoiceIndices.AsParallelWriter()
+                        OutputBuffer = BusBuffers,
+                        FinishedVoices = FinishedVoiceIndices
                     };
 
-                    Handles[i] = job.Schedule(input);
+                    BusJobHandles[bus] = job.Schedule(input);
                 }
 
-                voicesJobHandle = JobHandle.CombineDependencies(Handles);
+                var combinedHandle = JobHandle.CombineDependencies(BusJobHandles);
 
-                // 2. Mix all temp voice buffers into the MixBuffer.
-                var mixJob = new MixJob
+                mixJobHandle = new MixJob
                 {
-                    ArchetypeBuffers = TempBuffers,
-                    MixBuffer = MixBuffer,
-                    ArchetypeCount = archetypeCount,
-                    BufferLength = bufferLength
-                };
-
-                // Schedule the mix job
-                mixJobHandle = mixJob.Schedule(bufferLength, 64, voicesJobHandle);
+                    Buffers = BusBuffers,
+                    BusMeta = BusMeta,
+                    BufferLength = BusMeta[0].Size
+                }.Schedule(combinedHandle);
             }
 
+            #endregion
+
+            #region Jobs
+
             [BurstCompile]
-            struct ArchetypeVoiceJob : IJob
+            struct BusMixJob : IJob
             {
-                [ReadOnly] public ArchetypeMeta Meta;
-                [ReadOnly] public NativeArray<int> ActiveIndices;
-                // [ReadOnly] public NativeArray<byte> ActiveFlags; // No longer needed
-                [ReadOnly] public NativeSlice<float> Gains;
+                [ReadOnly] public NativeArray<ArchetypeMeta> Archetypes;
+                [ReadOnly] public NativeArray<int> ActiveArchetypes;
+                [ReadOnly] public NativeArray<int> ActiveVoices;
+                [ReadOnly] public NativeArray<float> Gains;
                 [ReadOnly] public AudioFormat Format;
 
-                [NativeDisableParallelForRestriction]
                 public NativeArray<int> PlaybackPositions;
+                public NativeArray<float> OutputBuffer;
+                public NativeQueue<int> FinishedVoices;
 
-                [WriteOnly] public NativeQueue<int>.ParallelWriter FinishedQueue; // TBA Check if other paterns are better
+                public BusMeta BusMeta;
 
-                public NativeSlice<float> OutputBuffer;
+                [BurstCompile]
+                public void Execute()
+                {
+                    var busBuffer = OutputBuffer.Slice(BusMeta.Start, BusMeta.Size);
+                    int channels = Format.channelCount;
+                    int frames = busBuffer.Length / channels;
+
+                    int currentArchetypeIndex = -1;
+                    BlobAssetReference<VoiceBlob> currentBlob = default;
+                    int currentClipChannelCount = 0;
+                    int currentClipSampleCount = 0;
+
+                    for (int v = 0; v < ActiveVoices.Length; v++)
+                    {
+                        int global = ActiveVoices[v];
+                        int archetypeIndex = ActiveArchetypes[v];
+
+                        // Cache-previous optimization
+                        if (archetypeIndex != currentArchetypeIndex)
+                        {
+                            currentArchetypeIndex = archetypeIndex;
+                            var meta = Archetypes[archetypeIndex];
+                            currentBlob = meta.Blob;
+                            ref var blobRef = ref currentBlob.Value;
+
+                            if (blobRef.Clips.Length == 0)
+                            {
+                                currentArchetypeIndex = -1; // Mark invalid
+                                continue;
+                            }
+
+                            ref var clip = ref blobRef.Clips[0];
+                            currentClipChannelCount = clip.ChannelCount;
+                            currentClipSampleCount = clip.SampleCount;
+                        }
+
+                        if (currentArchetypeIndex == -1) continue;
+
+                        ref var samples = ref currentBlob.Value.Clips[0].Samples;
+                        int pos = PlaybackPositions[global];
+
+                        for (int f = 0; f < frames; f++)
+                        {
+                            if (pos >= currentClipSampleCount)
+                            {
+                                if (!currentBlob.Value.Loop)
+                                {
+                                    FinishedVoices.Enqueue(global);
+                                    break;
+                                }
+                                pos = 0;
+                            }
+
+                            int srcBase = pos * currentClipChannelCount;
+                            int dstBase = f * channels;
+                            int gainBase = global * channels;
+
+                            for (int ch = 0; ch < channels; ch++)
+                            {
+                                int srcCh = ch < currentClipChannelCount ? ch : 0;
+                                busBuffer[dstBase + ch] +=
+                                    samples[srcBase + srcCh] * Gains[gainBase + ch];
+                            }
+
+                            pos++;
+                        }
+
+                        PlaybackPositions[global] = pos;
+                    }
+                }
+            }
+
+
+            [BurstCompile]
+            struct MixJob : IJob
+            {
+                public NativeArray<float> Buffers;
+                public NativeArray<BusMeta> BusMeta;
+                public int BufferLength;
 
                 public void Execute()
                 {
-                    ref var blob = ref Meta.Blob.Value;
-                    if (blob.Clips.Length == 0) return;
+                    var master = Buffers.Slice(0, BufferLength);
+                    // No zeroing here, master bus (index 0) is populated by BusMixJob or remains empty if nothing plays.
 
-                    // "For now just play clip one"
-                    ref var clip = ref blob.Clips[0];
-                    if (clip.Samples.Length == 0) return;
-
-                    ref var samples = ref clip.Samples;
-                    int clipSampleCount = clip.SampleCount;
-                    int clipChannels = clip.ChannelCount;
-                    int outputChannels = Format.channelCount;
-                    int bufferFrames = OutputBuffer.Length / outputChannels;
-
-                    // Iterate through all active voices in this archetype
-                    for (int i = 0; i < ActiveIndices.Length; i++)
+                    for (int i = 1; i < BusMeta.Length; i++)
                     {
-                        int globalIndex = ActiveIndices[i];
-                        int localIndex = globalIndex - Meta.Start;
-
-                        // Calculate gain index base using local index
-                        int gainIndexBase = localIndex * outputChannels;
-
-                        int position = PlaybackPositions[globalIndex];
-
-                        // Check if already finished
-                        if (position >= clipSampleCount && !blob.Loop)
-                            continue;
-
-                        // Read samples
-                        for (int f = 0; f < bufferFrames; f++)
-                        {
-                            if (position >= clipSampleCount)
-                            {
-                                if (blob.Loop)
-                                {
-                                    position = 0;
-                                }
-                                else
-                                {
-                                    // Finished
-                                    position = clipSampleCount;
-                                    break;
-                                }
-                            }
-
-                            for (int ch = 0; ch < outputChannels; ch++)
-                            {
-                                // Determine source channel mapping
-                                // If source is mono (1 ch), read ch 0. If stereo, read matches.
-                                int srcCh = (ch < clipChannels) ? ch : 0;
-
-                                int sampleIndex = position * clipChannels + srcCh;
-                                float sample = samples[sampleIndex];
-
-                                // Apply gain
-                                float gain = Gains[gainIndexBase + ch];
-
-                                OutputBuffer[f * outputChannels + ch] += sample * gain;
-                            }
-
-                            position++;
-                        }
-
-                        PlaybackPositions[globalIndex] = position;
-
-                        if (position >= clipSampleCount && !blob.Loop)
-                        {
-                            FinishedQueue.Enqueue(globalIndex);
-                        }
+                        var src = Buffers.Slice(BusMeta[i].Start, BusMeta[i].Size);
+                        for (int j = 0; j < src.Length; j++)
+                            master[j] += src[j];
                     }
                 }
             }
 
-            [BurstCompile]
-            struct MixJob : IJobParallelFor
-            {
-                [ReadOnly] public NativeArray<float> ArchetypeBuffers;
-                public NativeArray<float> MixBuffer;
-                public int ArchetypeCount;
-                public int BufferLength;
+            #endregion
 
-                public void Execute(int index)
-                {
-                    float sum = 0f;
-                    int baseOffset = index;
-
-                    for (int i = 0; i < ArchetypeCount; i++)
-                        sum += ArchetypeBuffers[i * BufferLength + baseOffset];
-
-                    MixBuffer[index] = sum; // you already cleared MixBuffer, so = is fine
-                }
-            }
+            #region EndProcessing
 
             public void EndProcessing(in RealtimeContext context, Pipe pipe, ChannelBuffer output)
             {
                 mixJobHandle.Complete();
 
-                int frameCount = output.frameCount;
-                int channelCount = output.channelCount;
-
-                for (int frame = 0; frame < frameCount; frame++)
+                int channels = output.channelCount;
+                for (int f = 0; f < output.frameCount; f++)
                 {
-                    int baseIndex = frame * channelCount;
-                    for (int ch = 0; ch < channelCount; ch++)
-                    {
-                        output[ch, frame] = MixBuffer[baseIndex + ch];
-                    }
+                    int baseIdx = f * channels;
+                    for (int ch = 0; ch < channels; ch++)
+                        output[ch, f] = BusBuffers[baseIdx + ch];
                 }
 
                 while (FinishedVoiceIndices.TryDequeue(out int idx))
-                {
                     pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
-                }
+            }
+
+            #endregion
+
+            public JobHandle EarlyProcessing(in RealtimeContext context, Pipe pipe)
+            {
+                // Not used in this sketch, but this is another place where you // could read messages if you wanted them as close to Process as possible. return default;
+                return default;
             }
 
             public void RemovedFromProcessing()
             {
-                // Buffers are owned and disposed by the Control side (Dispose / reconfigure).
-                // Dispose internal lists
-                if (ArchetypeActiveVoices.IsCreated)
-                {
-                    if (FinishedVoiceIndices.IsCreated) FinishedVoiceIndices.Dispose();
+                // Ensure any pending jobs are completed
+                if (mixJobHandle.IsCompleted == false)
+                    mixJobHandle.Complete();
 
-                    for (int i = 0; i < ArchetypeActiveVoices.Length; i++)
+                for (int i = 0; i < BusJobHandles.Length; i++)
+                {
+                    if (BusJobHandles[i].IsCompleted == false)
+                        BusJobHandles[i].Complete();
+                }
+
+                if (VoiceActiveFlags.IsCreated) VoiceActiveFlags.Dispose();
+                if (Gains.IsCreated) Gains.Dispose();
+                if (PlaybackSpeeds.IsCreated) PlaybackSpeeds.Dispose();
+                if (PlaybackPositions.IsCreated) PlaybackPositions.Dispose();
+                if (FinishedVoiceIndices.IsCreated) FinishedVoiceIndices.Dispose();
+
+                if (Archetypes.IsCreated) Archetypes.Dispose();
+
+                if (BusMeta.IsCreated) BusMeta.Dispose();
+                if (BusBuffers.IsCreated) BusBuffers.Dispose();
+                if (BusJobHandles.IsCreated) BusJobHandles.Dispose();
+
+                if (BusActiveArchetypes.IsCreated)
+                {
+                    for (int i = 0; i < BusActiveArchetypes.Length; i++)
                     {
-                        if (ArchetypeActiveVoices[i].IsCreated)
-                            ArchetypeActiveVoices[i].Dispose();
+                        if (BusActiveArchetypes[i].IsCreated)
+                            BusActiveArchetypes[i].Dispose();
                     }
-                    ArchetypeActiveVoices.Dispose();
+                    BusActiveArchetypes.Dispose();
+                }
+
+                if (BusActiveVoices.IsCreated)
+                {
+                    for (int i = 0; i < BusActiveVoices.Length; i++)
+                    {
+                        if (BusActiveVoices[i].IsCreated)
+                            BusActiveVoices[i].Dispose();
+                    }
+                    BusActiveVoices.Dispose();
                 }
             }
-
-            #endregion
         }
     }
 }

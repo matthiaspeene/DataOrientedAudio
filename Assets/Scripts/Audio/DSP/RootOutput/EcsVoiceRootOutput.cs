@@ -23,6 +23,13 @@ namespace DataOrientedAudio.DSP.RootOutput
         public int Count;
     }
 
+    public struct BusMeta
+    {
+        public int Start;
+        public int Size;
+        public int ChannelCount;
+    }
+
     #region Pipe messages
 
 

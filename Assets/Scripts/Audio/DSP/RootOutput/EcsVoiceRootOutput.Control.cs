@@ -58,18 +58,19 @@ namespace DataOrientedAudio.DSP.RootOutput
                 realtime.Format = format;
 
                 EnsureArray(ref realtime.Archetypes, _maxArchetypes);
-                EnsureArray(ref realtime.Gains, _totalVoices * format.channelCount);
                 EnsureArray(ref realtime.VoiceActiveFlags, _totalVoices);
+                EnsureArray(ref realtime.Gains, _totalVoices * format.channelCount);
+                EnsureArray(ref realtime.PlaybackSpeeds, _totalVoices);
                 EnsureArray(ref realtime.PlaybackPositions, _totalVoices);
 
-                // Mix buffer: one sample per channel per frame.
+                // Bus data
                 var bufferSamples = format.bufferFrameCount * format.channelCount;
-                EnsureArray(ref realtime.MixBuffer, bufferSamples);
+                EnsureArray(ref realtime.BusMeta, _topology.MaxBuses);
+                EnsureArray(ref realtime.BusBuffers, bufferSamples * _topology.MaxBuses);
+                EnsureArray(ref realtime.BusJobHandles, _topology.MaxBuses);
 
-                // Temp buffers for archetype mixing: maxArchetypes * bufferSamples
-                EnsureArray(ref realtime.TempBuffers, _maxArchetypes * bufferSamples);
-                EnsureArray(ref realtime.Handles, _maxArchetypes);
-                //EnsureArray(ref realtime.ArchetypeActiveCounts, _maxArchetypes);
+                EnsureNestedListArray(ref realtime.BusActiveArchetypes, _topology.MaxBuses);
+                EnsureNestedListArray(ref realtime.BusActiveVoices, _topology.MaxBuses);
 
                 // Reset bootstrap flag so we send messages in the first Update
                 _bootstrapSent = false;
@@ -89,46 +90,62 @@ namespace DataOrientedAudio.DSP.RootOutput
             }
 
             public void Dispose(ControlContext context, ref Realtime realtime)
+            private void EnsureNestedListArray<T>(ref NativeArray<NativeList<T>> array, int length) where T : unmanaged
             {
-                if (realtime.Archetypes.IsCreated)
+                if (array.IsCreated && array.Length == length)
+                    return;
+
+                if (array.IsCreated)
                 {
-                    realtime.Archetypes.Dispose();
+                    for (int i = 0; i < array.Length; i++)
+                    {
+                        if (array[i].IsCreated)
+                            array[i].Dispose();
+                    }
+                    array.Dispose();
                 }
 
-                if (realtime.Gains.IsCreated)
+                array = new NativeArray<NativeList<T>>(length, Allocator.Persistent);
+                for (int i = 0; i < length; i++)
                 {
-                    realtime.Gains.Dispose();
+                    array[i] = new NativeList<T>(Allocator.Persistent);
+                }
+            }
+
+            public void Dispose(ControlContext context, ref Realtime realtime)
+            {
+                if (realtime.Archetypes.IsCreated) realtime.Archetypes.Dispose();
+
+                if (realtime.Gains.IsCreated) realtime.Gains.Dispose();
+                if (realtime.VoiceActiveFlags.IsCreated) realtime.VoiceActiveFlags.Dispose();
+                if (realtime.PlaybackPositions.IsCreated) realtime.PlaybackPositions.Dispose();
+                if (realtime.PlaybackSpeeds.IsCreated) realtime.PlaybackSpeeds.Dispose();
+
+                if (realtime.BusMeta.IsCreated) realtime.BusMeta.Dispose();
+                if (realtime.BusBuffers.IsCreated) realtime.BusBuffers.Dispose();
+                if (realtime.BusJobHandles.IsCreated) realtime.BusJobHandles.Dispose();
+
+                if (realtime.BusActiveArchetypes.IsCreated)
+                {
+                    for (int i = 0; i < realtime.BusActiveArchetypes.Length; i++)
+                    {
+                        if (realtime.BusActiveArchetypes[i].IsCreated)
+                            realtime.BusActiveArchetypes[i].Dispose();
+                    }
+                    realtime.BusActiveArchetypes.Dispose();
                 }
 
-                if (realtime.VoiceActiveFlags.IsCreated)
+                if (realtime.BusActiveVoices.IsCreated)
                 {
-                    realtime.VoiceActiveFlags.Dispose();
+                    for (int i = 0; i < realtime.BusActiveVoices.Length; i++)
+                    {
+                        if (realtime.BusActiveVoices[i].IsCreated)
+                            realtime.BusActiveVoices[i].Dispose();
+                    }
+                    realtime.BusActiveVoices.Dispose();
                 }
 
-                //if (realtime.ArchetypeActiveCounts.IsCreated)
-                //{
-                //    realtime.ArchetypeActiveCounts.Dispose();
-                //}
-
-                if (realtime.MixBuffer.IsCreated)
-                {
-                    realtime.MixBuffer.Dispose();
-                }
-
-                if (realtime.PlaybackPositions.IsCreated)
-                {
-                    realtime.PlaybackPositions.Dispose();
-                }
-
-                if (realtime.TempBuffers.IsCreated)
-                {
-                    realtime.TempBuffers.Dispose();
-                }
-
-                if (realtime.Handles.IsCreated)
-                {
-                    realtime.Handles.Dispose();
-                }
+                if (realtime.FinishedVoiceIndices.IsCreated) realtime.FinishedVoiceIndices.Dispose();
             }
 
             public void Update(ControlContext context, Pipe pipe)

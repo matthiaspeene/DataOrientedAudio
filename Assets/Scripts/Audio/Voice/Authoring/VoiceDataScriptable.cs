@@ -34,7 +34,10 @@ namespace DataOrientedAudio.Voice.Authoring
         [Tooltip("Used when TriggerMode is Repeat. X = min delay, Y = max delay (seconds).")]
         [SerializeField] private Vector2 _repeatDelayRange = new(0f, 0f);
 
-        [Header("Pooling")]
+        [Header("Mixing")]
+        [SerializeField] private BusId _bus = BusId.Master;
+
+        [Header("Concurrency")]
         [SerializeField] private int _maxVoices = 16;
 
         [Header("Spatialization")]
@@ -48,6 +51,7 @@ namespace DataOrientedAudio.Voice.Authoring
         public Vector2 RepeatDelayRange => _repeatDelayRange;
         public int MaxVoices => _maxVoices;
         public AudioEventSpace Space => _space;
+        public int MixBusIndex => (int)_bus;
 
         public RandomRange GetPitchAsPlaybackSpeedRange()
         {

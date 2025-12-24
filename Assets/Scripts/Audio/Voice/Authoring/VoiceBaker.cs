@@ -72,7 +72,7 @@ namespace DataOrientedAudio.Voice.Authoring
                     gains.Add(new OutChannelGain { Value = 1f });
                 }
 
-                AddComponent(voiceEntity, new MixGainMod { BusIndex = -1, Value = 1f });
+                AddComponent(voiceEntity, new MixGainMod { BusIndex = voiceData.MixBusIndex, Value = 1f });
 
                 if (voiceData.UseRandomGain)
                 {

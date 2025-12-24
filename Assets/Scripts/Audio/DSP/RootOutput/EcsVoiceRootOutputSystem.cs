@@ -38,7 +38,7 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         // Estimate buffer size based on AudioSettings
         var config = AudioSettings.GetConfiguration();
 
-        var realtime = new EcsVoiceRootOutput.Realtime(topology.MaxArchetypes, topology.TotalVoices, config.dspBufferSize, config.speakerMode);
+        var realtime = new EcsVoiceRootOutput.Realtime(topology.MaxArchetypes, topology.TotalVoices, config.dspBufferSize, config.speakerMode, topology.MaxBuses);
 
         var control = new EcsVoiceRootOutput.Control(topology.MaxArchetypes, topology.TotalVoices);
 

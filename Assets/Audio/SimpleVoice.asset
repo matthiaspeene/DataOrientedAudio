@@ -22,5 +22,6 @@ MonoBehaviour:
     Max: 0
   _triggermode: 2
   _repeatDelayRange: {x: 0, y: 1}
+  _bus: 2
   _maxVoices: 2200
   _space: 1

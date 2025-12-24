@@ -32,6 +32,7 @@ namespace DataOrientedAudio.Voice.Runtime
     {
         public int MaxArchetypes;
         public int TotalVoices;
+        public int MaxBuses;
         public NativeArray<AudioTopologyArchetype> Archetypes;
     }
 }

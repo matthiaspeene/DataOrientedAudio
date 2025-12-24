@@ -1,6 +1,7 @@
 using Unity.Collections;
 using Unity.Entities;
 using DataOrientedAudio.Voice.Runtime;
+using DataOrientedAudio.Busses.Generated;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
 {
@@ -10,6 +11,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         #region Fields
 
         private NativeList<AudioTopologyArchetype> _archetypes;
+        private int _busCount;
         private bool _isInitialized;
 
         #endregion
@@ -69,6 +71,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 {
                     MaxArchetypes = 0,
                     TotalVoices = 0,
+                    MaxBuses = 0,
                     Archetypes = default
                 };
             }
@@ -87,6 +90,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             {
                 MaxArchetypes = _archetypes.Length,
                 TotalVoices = totalVoiceCount,
+                MaxBuses = System.Enum.GetValues(typeof(BusId)).Length, // TODO: This is not optimal, we need to count the number of "real" buses in the topology wich will be the "pruned" list of buses
                 Archetypes = _archetypes.AsArray()
             };
         }
@@ -117,6 +121,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             BuildTopologyArchetypes(voiceTypeData);
             AssignArchetypeIndices(voiceTypeData.SortedTypeIds);
             CreateOrUpdateSingleton();
+
+            var busCount = 1; // TODO: This is not correct, we need to count the number of buses in the topology
 
             _isInitialized = true;
 
