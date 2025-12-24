@@ -25,38 +25,24 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<VoiceIsSpatial>();
+            // Only run if we have an AudioListener and at least one active spatial voice.
+            // RequireForUpdate with IEnableableComponent correctly respects the enabled state.
+            state.RequireForUpdate<AudioListener>();
 
-            // Create listener query once
-            _listenerQuery = SystemAPI.QueryBuilder().WithAll<AudioListenerTag, AudioListener>().Build();
+            var query = SystemAPI.QueryBuilder()
+                .WithAll<VoiceActive>()
+                .WithAll<LocalTransform, SpatializationChannelGains>()
+                .Build();
+            state.RequireForUpdate(query);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // Query the AudioListener singleton
-            float3 listenerPosition = float3.zero;
-            float3 listenerRight = new float3(1, 0, 0);
-
-            bool hasListener = SystemAPI.TryGetSingleton<AudioListener>(out var listener);
-
-            // TEMPORARY DEBUG - Remove BurstCompile attribute to enable this
-#if UNITY_EDITOR
-            if (!hasListener)
-            {
-                UnityEngine.Debug.LogWarning("[SpatializationSystem] No AudioListener singleton found!");
-            }
-            else
-            {
-                UnityEngine.Debug.Log($"[SpatializationSystem] Listener at {listener.Position}, Right={listener.Right}");
-            }
-#endif
-
-            if (hasListener)
-            {
-                listenerPosition = listener.Position;
-                listenerRight = listener.Right;
-            }
+            // SystemAPI.GetSingleton is safe here because of RequireForUpdate<AudioListener>
+            var listener = SystemAPI.GetSingleton<AudioListener>();
+            float3 listenerPosition = listener.Position;
+            float3 listenerRight = listener.Right;
 
             // Schedule the spatialization job
             var job = new SpatializationJob
@@ -68,7 +54,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 CenterPanGain = CenterPanGain
             };
 
-            job.ScheduleParallel();
+            // Crucial: Must assign the returned JobHandle to state.Dependency
+            state.Dependency = job.ScheduleParallel(state.Dependency);
         }
     }
 
@@ -77,7 +64,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     /// Uses equal-power panning law: L = cos(θ), R = sin(θ) where θ = (pan + 1) * π/4
     /// </summary>
     [BurstCompile]
-    [WithAll(typeof(VoiceActive), typeof(VoiceIsSpatial))]
+    [WithAll(typeof(VoiceActive))]
     public partial struct SpatializationJob : IJobEntity
     {
         [ReadOnly] public float3 ListenerPosition;
@@ -93,6 +80,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             // Calculate direction from listener to voice (horizontal plane only for stereo)
             float3 toVoice = transform.Position - ListenerPosition;
 
+            // UnityEngine.Debug.Log("toVoice: " + toVoice); // But this is never called. Why?
+
             // Project onto horizontal plane (ignore vertical component for stereo panning)
             toVoice.y = 0f;
 
@@ -107,8 +96,12 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 return;
             }
 
+            // UnityEngine.Debug.Log("distance: " + distance);
+
             // Normalize direction
             float3 direction = toVoice / distance;
+
+            // UnityEngine.Debug.Log("direction: " + direction);
 
             // Calculate pan value (-1 to +1) using dot product with listener's right vector
             float pan = math.dot(direction, ListenerRight);

@@ -74,10 +74,6 @@ namespace DataOrientedAudio.Voice.Runtime
 
     #region Spatialization Components
 
-    // Tag: If enabled, this voice is treated as 3D/Spatial.
-    // If disabled, it is 2D (Stereo).
-    public struct VoiceIsSpatial : IComponentData, IEnableableComponent { }
-
     // Data: If enabled, this voice follows a target entity.
     public struct VoiceFollowsEntity : IComponentData, IEnableableComponent
     {

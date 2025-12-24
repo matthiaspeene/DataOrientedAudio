@@ -77,8 +77,6 @@ namespace DataOrientedAudio.Voice.Runtime
             listener.Up = t.up;
             listener.PreviousPosition = currentPosition;
 
-            Debug.Log("AudioListenerSync: " + listener.Position);
-
             _entityManager.SetComponentData(_listenerEntity, listener);
         }
 

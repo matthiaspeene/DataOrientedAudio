@@ -28,11 +28,19 @@ namespace DataOrientedAudio.Voice.Authoring
             // This blob contains ALL clip data for this voice type
             BlobAssetReference<VoiceBlob> voiceBlobRef = CreateVoiceBlob(voiceData);
 
+            // Determine transformation flags based on the voice type's spatial setting.
+            // Spatial voices require transform components to be processed by the audio system.
+            TransformUsageFlags transformUsageFlags = authoring.VoiceData.Space == AudioEventSpace.Stereo2D
+                ? TransformUsageFlags.None
+                : TransformUsageFlags.Dynamic;
+
             // Pool Loop
             for (int v = 0; v < voiceData.MaxVoices; v++)
             {
                 // Create entity (first one is 'entity', others are additional)
-                Entity voiceEntity = (v == 0) ? GetEntity(TransformUsageFlags.None) : CreateAdditionalEntity(TransformUsageFlags.None, false, voiceBlobRef.ToString());
+                Entity voiceEntity = (v == 0)
+                    ? GetEntity(transformUsageFlags)
+                    : CreateAdditionalEntity(transformUsageFlags, false, voiceBlobRef.ToString());
 
                 // 1. Core Data
                 int typeId = voiceData.name.GetHashCode();
@@ -42,36 +50,29 @@ namespace DataOrientedAudio.Voice.Authoring
                 AddBlobAsset(ref voiceBlobRef, out _);
                 AddComponent(voiceEntity, new VoiceBlobReference { Value = voiceBlobRef });
 
-                // Note: We no longer need a SampleDataBlob buffer - all clip data is in the VoiceBlob
-
                 // 2. Spatialization (Archetypes)
                 switch (voiceData.Space)
                 {
                     case AudioEventSpace.World3D:
-                        // Add Transform
+                        // The LocalTransform is already added by TransformUsageFlags.Dynamic.
+                        // We set/overwrite it here to ensure the pool entity has a clean default.
                         AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
-                        
+
                         // Add Spatialization Components
-                        AddComponent<VoiceIsSpatial>(voiceEntity);
-                        SetComponentEnabled<VoiceIsSpatial>(voiceEntity, true);
-                        
                         var spatialGains = AddBuffer<SpatializationChannelGains>(voiceEntity);
                         spatialGains.Add(new SpatializationChannelGains { Value = CenterPanGain }); // Left channel (center pan)
                         spatialGains.Add(new SpatializationChannelGains { Value = CenterPanGain }); // Right channel (center pan)
                         break;
 
                     case AudioEventSpace.Attached3D:
-                        // Add Transform
+                        // The LocalTransform is already added by TransformUsageFlags.Dynamic.
                         AddComponent(voiceEntity, new LocalTransform { Position = float3.zero, Rotation = quaternion.identity, Scale = 1f });
 
-                        // Add Spatial Components
+                        // Add Follow Components
                         AddComponent(voiceEntity, new VoiceFollowsEntity { Target = Entity.Null });
                         AddComponent(voiceEntity, new VoicePositionOffset { Value = float3.zero });
-                        
+
                         // Add Spatialization Components
-                        AddComponent<VoiceIsSpatial>(voiceEntity);
-                        SetComponentEnabled<VoiceIsSpatial>(voiceEntity, true);
-                        
                         var attachedSpatialGains = AddBuffer<SpatializationChannelGains>(voiceEntity);
                         attachedSpatialGains.Add(new SpatializationChannelGains { Value = CenterPanGain }); // Left channel (center pan)
                         attachedSpatialGains.Add(new SpatializationChannelGains { Value = CenterPanGain }); // Right channel (center pan)
@@ -79,7 +80,7 @@ namespace DataOrientedAudio.Voice.Authoring
 
                     case AudioEventSpace.Stereo2D:
                     default:
-                        // No spatial components
+                        // No local transform or spatial components for 2D.
                         break;
                 }
 
