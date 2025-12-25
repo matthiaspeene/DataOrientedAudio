@@ -295,7 +295,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 public BusMeta BusMeta;
 
                 [BurstCompile]
-                public void Execute()
+                public unsafe void Execute()
                 {
                     var busBuffer = OutputBuffer.Slice(BusMeta.Start, BusMeta.Size);
                     int channels = Format.channelCount;
@@ -317,17 +317,24 @@ namespace DataOrientedAudio.DSP.RootOutput
                             currentArchetypeIndex = archetypeIndex;
                             var meta = Archetypes[archetypeIndex];
                             currentBlob = meta.Blob;
-                            ref var blobRef = ref currentBlob.Value;
-
-                            if (blobRef.Clips.Length == 0)
+                            if (currentBlob.IsCreated)
                             {
-                                currentArchetypeIndex = -1; // Mark invalid
-                                continue;
+                                ref var blobRef = ref currentBlob.Value;
+                                if (blobRef.Clips.Length > 0)
+                                {
+                                    ref var clip = ref blobRef.Clips[0];
+                                    currentClipChannelCount = clip.ChannelCount;
+                                    currentClipSampleCount = clip.SampleCount;
+                                }
+                                else
+                                {
+                                    currentArchetypeIndex = -1;
+                                }
                             }
-
-                            ref var clip = ref blobRef.Clips[0];
-                            currentClipChannelCount = clip.ChannelCount;
-                            currentClipSampleCount = clip.SampleCount;
+                            else
+                            {
+                                currentArchetypeIndex = -1;
+                            }
                         }
 
                         if (currentArchetypeIndex == -1) continue;
@@ -336,57 +343,141 @@ namespace DataOrientedAudio.DSP.RootOutput
                         float pos = PlaybackPositions[global];
                         float speed = PlaybackSpeeds[global];
                         bool loop = currentBlob.Value.Loop;
+                        int gainBase = global * channels;
 
-                        for (int f = 0; f < frames; f++)
+                        // Pointers for faster access
+                        float* outPtr = (float*)OutputBuffer.GetUnsafePtr() + BusMeta.Start;
+                        float* samplePtr = (float*)samples.GetUnsafePtr();
+
+                        // Resampling and Mixing
+                        if (channels == 2 && currentClipChannelCount == 1)
                         {
-                            if (pos >= currentClipSampleCount || pos < 0)
+                            // Stereo Output, Mono Source
+                            float2 targetGain = *(float2*)((float*)Gains.GetUnsafeReadOnlyPtr() + gainBase);
+                            float2 prevGain = *(float2*)((float*)PreviousGains.GetUnsafePtr() + gainBase);
+                            float2 gainStep = (targetGain - prevGain) / frames;
+                            float2 currentGain = prevGain;
+
+                            for (int f = 0; f < frames; f++)
                             {
-                                if (!loop)
+                                if (pos >= currentClipSampleCount || pos < 0)
                                 {
-                                    FinishedVoices.Enqueue(global);
-                                    break;
+                                    if (!loop) { FinishedVoices.Enqueue(global); break; }
+                                    pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
                                 }
-                                pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
+
+                                int floorPos = (int)math.floor(pos);
+                                int ceilPos = (loop && floorPos == currentClipSampleCount - 1) ? 0 : floorPos + 1;
+                                float frac = pos - floorPos;
+
+                                float s0 = samplePtr[floorPos];
+                                float s1 = (ceilPos < currentClipSampleCount) ? samplePtr[ceilPos] : 0f;
+                                float sample = math.lerp(s0, s1, frac);
+
+                                float2* dst = (float2*)(outPtr + f * 2);
+                                *dst += sample * currentGain;
+
+                                currentGain += gainStep;
+                                pos += speed;
                             }
+                            *(float2*)((float*)PreviousGains.GetUnsafePtr() + gainBase) = targetGain;
+                        }
+                        else if (channels == 2 && currentClipChannelCount == 2)
+                        {
+                            // Stereo Output, Stereo Source
+                            float2 targetGain = *(float2*)((float*)Gains.GetUnsafeReadOnlyPtr() + gainBase);
+                            float2 prevGain = *(float2*)((float*)PreviousGains.GetUnsafePtr() + gainBase);
+                            float2 gainStep = (targetGain - prevGain) / frames;
+                            float2 currentGain = prevGain;
 
-                            int floorPos = (int)math.floor(pos);
-                            int ceilPos = floorPos + 1;
-                            float frac = pos - floorPos;
+                            for (int f = 0; f < frames; f++)
+                            {
+                                if (pos >= currentClipSampleCount || pos < 0)
+                                {
+                                    if (!loop) { FinishedVoices.Enqueue(global); break; }
+                                    pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
+                                }
 
-                            int gainBase = global * channels;
-                            float t = (float)f / frames;
-                            int dstBase = f * channels;
+                                int floorPos = (int)math.floor(pos);
+                                int ceilPos = (loop && floorPos == currentClipSampleCount - 1) ? 0 : floorPos + 1;
+                                float frac = pos - floorPos;
+
+                                float2 s0 = *(float2*)(samplePtr + floorPos * 2);
+                                float2 s1 = (ceilPos < currentClipSampleCount) ? *(float2*)(samplePtr + ceilPos * 2) : 0f;
+                                float2 sample = math.lerp(s0, s1, frac);
+
+                                float2* dst = (float2*)(outPtr + f * 2);
+                                *dst += sample * currentGain;
+
+                                currentGain += gainStep;
+                                pos += speed;
+                            }
+                            *(float2*)((float*)PreviousGains.GetUnsafePtr() + gainBase) = targetGain;
+                        }
+                        else if (channels == 1 && currentClipChannelCount == 1)
+                        {
+                            // Mono Output, Mono Source
+                            float targetGain = Gains[gainBase];
+                            float prevGain = PreviousGains[gainBase];
+                            float gainStep = (targetGain - prevGain) / frames;
+                            float currentGain = prevGain;
+
+                            for (int f = 0; f < frames; f++)
+                            {
+                                if (pos >= currentClipSampleCount || pos < 0)
+                                {
+                                    if (!loop) { FinishedVoices.Enqueue(global); break; }
+                                    pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
+                                }
+
+                                int floorPos = (int)math.floor(pos);
+                                int ceilPos = (loop && floorPos == currentClipSampleCount - 1) ? 0 : floorPos + 1;
+                                float frac = pos - floorPos;
+
+                                float s0 = samplePtr[floorPos];
+                                float s1 = (ceilPos < currentClipSampleCount) ? samplePtr[ceilPos] : 0f;
+                                float sample = math.lerp(s0, s1, frac);
+
+                                outPtr[f] += sample * currentGain;
+
+                                currentGain += gainStep;
+                                pos += speed;
+                            }
+                            PreviousGains[gainBase] = targetGain;
+                        }
+                        else
+                        {
+                            // Generic Fallback
+                            for (int f = 0; f < frames; f++)
+                            {
+                                if (pos >= currentClipSampleCount || pos < 0)
+                                {
+                                    if (!loop) { FinishedVoices.Enqueue(global); break; }
+                                    pos -= (float)currentClipSampleCount * math.floor(pos / currentClipSampleCount);
+                                }
+
+                                int floorPos = (int)math.floor(pos);
+                                int ceilPos = (loop && floorPos == currentClipSampleCount - 1) ? 0 : floorPos + 1;
+                                float frac = pos - floorPos;
+
+                                float smoothedT = (float)f / frames;
+                                int dstBase = f * channels;
+
+                                for (int ch = 0; ch < channels; ch++)
+                                {
+                                    int srcCh = ch < currentClipChannelCount ? ch : 0;
+                                    float s0 = samplePtr[floorPos * currentClipChannelCount + srcCh];
+                                    float s1 = (ceilPos < currentClipSampleCount) ? samplePtr[ceilPos * currentClipChannelCount + srcCh] : 0f;
+                                    float sample = math.lerp(s0, s1, frac);
+                                    float smoothedGain = math.lerp(PreviousGains[gainBase + ch], Gains[gainBase + ch], smoothedT);
+
+                                    outPtr[dstBase + ch] += sample * smoothedGain;
+                                }
+                                pos += speed;
+                            }
 
                             for (int ch = 0; ch < channels; ch++)
-                            {
-                                int srcCh = ch < currentClipChannelCount ? ch : 0;
-
-                                // Linear interpolation for playback speed
-                                float s0 = samples[floorPos * currentClipChannelCount + srcCh];
-                                float s1 = 0f;
-                                if (ceilPos < currentClipSampleCount)
-                                {
-                                    s1 = samples[ceilPos * currentClipChannelCount + srcCh];
-                                }
-                                else if (loop)
-                                {
-                                    s1 = samples[srcCh];
-                                }
-
-                                float sample = math.lerp(s0, s1, frac);
-                                float smoothedGain = math.lerp(PreviousGains[gainBase + ch], Gains[gainBase + ch], t);
-
-                                busBuffer[dstBase + ch] += sample * smoothedGain;
-                            }
-
-                            pos += speed;
-                        }
-
-                        // Update previous gains for next block
-                        int voiceGainBase = global * channels;
-                        for (int ch = 0; ch < channels; ch++)
-                        {
-                            PreviousGains[voiceGainBase + ch] = Gains[voiceGainBase + ch];
+                                PreviousGains[gainBase + ch] = Gains[gainBase + ch];
                         }
 
                         PlaybackPositions[global] = pos;
@@ -399,19 +490,36 @@ namespace DataOrientedAudio.DSP.RootOutput
             struct MixJob : IJob
             {
                 public NativeArray<float> Buffers;
-                public NativeArray<BusMeta> BusMeta;
+                [ReadOnly] public NativeArray<BusMeta> BusMeta;
                 public int BufferLength;
 
-                public void Execute()
+                [BurstCompile]
+                public unsafe void Execute()
                 {
-                    var master = Buffers.Slice(0, BufferLength);
-                    // No zeroing here, master bus (index 0) is populated by BusMixJob or remains empty if nothing plays.
+                    float* bufferPtr = (float*)Buffers.GetUnsafePtr();
+                    float* masterPtr = bufferPtr; // Bus 0 is master
 
                     for (int i = 1; i < BusMeta.Length; i++)
                     {
-                        var src = Buffers.Slice(BusMeta[i].Start, BusMeta[i].Size);
-                        for (int j = 0; j < src.Length; j++)
-                            master[j] += src[j];
+                        var meta = BusMeta[i];
+                        float* srcPtr = bufferPtr + meta.Start;
+                        int size = meta.Size;
+
+                        int vectorSegments = size / 4;
+                        int remainder = size % 4;
+
+                        float4* masterVec = (float4*)masterPtr;
+                        float4* srcVec = (float4*)srcPtr;
+
+                        for (int v = 0; v < vectorSegments; v++)
+                        {
+                            masterVec[v] += srcVec[v];
+                        }
+
+                        for (int r = size - remainder; r < size; r++)
+                        {
+                            masterPtr[r] += srcPtr[r];
+                        }
                     }
                 }
             }

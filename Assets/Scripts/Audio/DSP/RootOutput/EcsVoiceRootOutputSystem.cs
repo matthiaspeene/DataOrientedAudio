@@ -1,4 +1,3 @@
-/*
 using Unity.Entities;
 using Unity.Collections;
 using UnityEngine;
@@ -75,4 +74,3 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
     }
 
 }
-*/
