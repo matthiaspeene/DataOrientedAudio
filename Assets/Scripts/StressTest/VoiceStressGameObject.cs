@@ -122,9 +122,9 @@ public class VoiceStressGameObject : MonoBehaviour
                 continue;
             }
 
-            audioSource.resource = clip;
+            audioSource.clip = clip;
             audioSource.volume = voiceData.GetRandomGain();
-            audioSource.pitch = voiceData.GetRandomPitch();
+            audioSource.pitch = voiceData.GetRandomPlaybackSpeed();
             audioSource.spatialBlend = voiceConfig.spatialized ? 1f : 0f;
             audioSource.playOnAwake = false;
 
@@ -192,10 +192,9 @@ public class VoiceStressGameObject : MonoBehaviour
                 yield break; // nothing to play anymore
             }
 
-            audioSource.resource = clip;
+            audioSource.clip = clip;
             audioSource.volume = voiceData.GetRandomGain();
-            audioSource.pitch = voiceData.GetRandomPitch();
-
+            audioSource.pitch = voiceData.GetRandomPlaybackSpeed();
             audioSource.loop = false;
             audioSource.Play();
 

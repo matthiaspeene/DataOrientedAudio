@@ -102,6 +102,12 @@ namespace DataOrientedAudio.Voice.Authoring
         public float GetRandomRepeatDelay() =>
             Random.Range(_repeatDelayRange.x, _repeatDelayRange.y);
 
+        /// <summary>
+        /// Returns a random playback speed multiplier based on the pitch range.
+        /// </summary>
+        public float GetRandomPlaybackSpeed() =>
+            PitchToPlaybackSpeed(GetRandomPitch());
+
         private float PitchToPlaybackSpeed(float pitch)
         {
             return Unity.Mathematics.math.pow(2f, pitch / 12f);

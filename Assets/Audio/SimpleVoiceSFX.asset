@@ -23,5 +23,5 @@ MonoBehaviour:
   _triggermode: 1
   _repeatDelayRange: {x: 0, y: 1}
   _bus: 2
-  _maxVoices: 1
+  _maxVoices: 255
   _space: 1
