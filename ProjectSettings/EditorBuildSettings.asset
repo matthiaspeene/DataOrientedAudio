@@ -5,9 +5,24 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/1_2DLooping.unity
+    guid: a4ec788ca5144614d922362f387c4e02
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/2_3DStaticLooping.unity
+    guid: de05a18651e2a7a459bafadaaff05c65
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/3_3DMovingLooping.unity
+    guid: 5e7c2b6886dc0a847b7a0e2b14997188
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/4_3DMovingRetrigger.unity
+    guid: c17c229575c1c5e47b6bbe7c90379a9a
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/5_LowVarience.unity
+    guid: 6a9e5e0a562c9c741b873fee7ae53fbd
+  - enabled: 1
+    path: Assets/Scenes/GameObjectTesting/6_HighVarience.unity
+    guid: 5488c8ffc7ea28840bb9e71316cff9f3
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

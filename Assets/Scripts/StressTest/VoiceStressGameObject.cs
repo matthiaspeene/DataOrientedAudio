@@ -30,9 +30,6 @@ public class VoiceStressGameObject : MonoBehaviour
             Debug.LogError("VoiceStressGameObject: No testConfig assigned.");
             return;
         }
-
-        // Start with first level automatically if you want instant load.
-        IncreaseStressLevel();
     }
 
     private void Update()
@@ -91,6 +88,8 @@ public class VoiceStressGameObject : MonoBehaviour
                 return;
             }
         }
+
+        Debug.Log($"Increased stress level to step {currentStressStep}. Currently spawned voices: {totalSpawnedSoFar}.");
     }
 
     private void SpawnVoicesOfType(VoiceSpawnConfig voiceConfig, int countToSpawn)
@@ -125,6 +124,7 @@ public class VoiceStressGameObject : MonoBehaviour
             audioSource.clip = clip;
             audioSource.volume = voiceData.GetRandomGain();
             audioSource.pitch = voiceData.GetRandomPlaybackSpeed();
+            audioSource.time = voiceData.GetRandomStartPosition();
             audioSource.spatialBlend = voiceConfig.spatialized ? 1f : 0f;
             audioSource.playOnAwake = false;
 

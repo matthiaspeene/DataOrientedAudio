@@ -288,9 +288,9 @@ MonoBehaviour:
   testMode: 0
   nextScene: 5_LowVarience
   startupDelay: 5
-  steps: 20
+  steps: 7
   stepDuration: 10
-  voiceStressGameObject: {fileID: 0}
+  voiceStressGameObject: {fileID: 300776350}
 --- !u!1 &2138472753
 GameObject:
   m_ObjectHideFlags: 0

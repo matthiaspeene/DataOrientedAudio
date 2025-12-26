@@ -16,9 +16,9 @@ MonoBehaviour:
   - amountRatio: 20
     voiceData: {fileID: 11400000, guid: 3add1f77a081b104eb8185cd6df2ec07, type: 2}
     spatialized: 1
-    moving: 0
-    minSpeed: 0
-    maxSpeed: 0
+    moving: 1
+    minSpeed: 5
+    maxSpeed: 20
     maxStartDelay: 0
     maxConcurrentVoices: 1000
   movementBounds: {x: 20, y: 10, z: 20}

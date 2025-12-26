@@ -106,6 +106,12 @@ namespace DataOrientedAudio.Voice.Authoring
             Random.Range(_repeatDelayRange.x, _repeatDelayRange.y);
 
         /// <summary>
+        /// Returns a random start position in seconds.
+        /// </summary>
+        public float GetRandomStartPosition() =>
+            Random.Range(_startPositionRange.Min, _startPositionRange.Max);
+
+        /// <summary>
         /// Returns a random playback speed multiplier based on the pitch range.
         /// </summary>
         public float GetRandomPlaybackSpeed() =>

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d728aafc1edf5f14a9700ca90173e1f1, type: 3}
-  m_Name: 5_LowVarience6
+  m_Name: 5_LowVarience
   m_EditorClassIdentifier: Assembly-CSharp::VoiceStressTestConfig
   voiceConfigs:
   - amountRatio: 20
@@ -25,24 +25,24 @@ MonoBehaviour:
     voiceData: {fileID: 11400000, guid: 0c394c197944c4f4fa835b7a872b7078, type: 2}
     spatialized: 1
     moving: 0
-    minSpeed: 0
-    maxSpeed: 0
+    minSpeed: 5
+    maxSpeed: 20
     maxStartDelay: 0
     maxConcurrentVoices: 1000
   - amountRatio: 5
     voiceData: {fileID: 11400000, guid: 6b7cbbe9040d27f4ab202ef2c7b6f310, type: 2}
     spatialized: 1
     moving: 1
-    minSpeed: 0
-    maxSpeed: 0
+    minSpeed: 5
+    maxSpeed: 20
     maxStartDelay: 0
     maxConcurrentVoices: 1000
   - amountRatio: 2
     voiceData: {fileID: 11400000, guid: a873fffc3df16b04fa00b9b7d0a86f81, type: 2}
     spatialized: 1
     moving: 1
-    minSpeed: 0
-    maxSpeed: 0
+    minSpeed: 5
+    maxSpeed: 20
     maxStartDelay: 0
     maxConcurrentVoices: 1000
   movementBounds: {x: 20, y: 10, z: 20}
