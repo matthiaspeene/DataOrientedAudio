@@ -31,5 +31,7 @@ namespace DataOrientedAudio.Common
         {
             return Min + (Max - Min) * t;
         }
+
+        public readonly bool IsRandom => Min != Max;
     }
 }

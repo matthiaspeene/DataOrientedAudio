@@ -201,16 +201,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                             busVoiceList.Add(active.GlobalVoiceIndex);
                             busArchetypeList.Add(active.ArchetypeIndex);
 
-                            // Starting position: 0 for forward, end for reverse
-                            float speed = PlaybackSpeeds[active.GlobalVoiceIndex];
-                            if (speed < 0 && arch.Blob.IsCreated && arch.Blob.Value.Clips.Length > 0)
-                            {
-                                PlaybackPositions[active.GlobalVoiceIndex] = arch.Blob.Value.Clips[0].SampleCount - 0.001f;
-                            }
-                            else
-                            {
-                                PlaybackPositions[active.GlobalVoiceIndex] = 0f;
-                            }
+                            // Set playback position from the message
+                            PlaybackPositions[active.GlobalVoiceIndex] = active.PlaybackPosition;
+                            //UnityEngine.Debug.Log("PlaybackPositions[" + active.GlobalVoiceIndex + "] = " + active.PlaybackPosition);
                         }
                         else
                         {

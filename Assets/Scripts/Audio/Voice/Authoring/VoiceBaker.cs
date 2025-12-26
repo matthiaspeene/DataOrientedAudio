@@ -104,6 +104,20 @@ namespace DataOrientedAudio.Voice.Authoring
                     });
                 }
 
+                // 3b. Playback Position
+                RandomRange randomPlaybackPositionRange = voiceData.GetPlaybackPositionRangeInSamples();
+                AddComponent(voiceEntity, new OutPlaybackStartPosition { Value = (int)randomPlaybackPositionRange.Min });
+                if (voiceData.UseRandomPlaybackPosition)
+                {
+                    AddComponent(voiceEntity, new RandomPlaybackPositionMod { Result = (int)randomPlaybackPositionRange.Min });
+                    AddSharedComponent(voiceEntity, new VoiceRandomPlaybackPositionRange
+                    {
+                        Min = (int)randomPlaybackPositionRange.Min,
+                        Max = (int)randomPlaybackPositionRange.Max
+                    });
+                    //Debug.Log("Added RandomPlaybackPositionMod " + voiceData.name + " " + randomPlaybackPositionRange.Min + " " + randomPlaybackPositionRange.Max);
+                }
+
                 // 4. Playback Speed
                 RandomRange playbackSpeedRange = voiceData.GetPitchAsPlaybackSpeedRange();
                 AddComponent(voiceEntity, new OutPlaybackSpeed { Value = playbackSpeedRange.Max });

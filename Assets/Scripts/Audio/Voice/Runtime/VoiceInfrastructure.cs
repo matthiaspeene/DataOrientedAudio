@@ -17,7 +17,8 @@ namespace DataOrientedAudio.Voice.Runtime
         public int ArchetypeIndex;
         public int LocalVoiceIndex;
         public int ChannelIndex; // To support multi-channel values. Set to -1 for shared values.
-        public float Value;   // Gain or 0/1 for active
+        public float Value;   // 0/1 for active
+        public int PlaybackPosition; // In samples
     }
 
     #endregion

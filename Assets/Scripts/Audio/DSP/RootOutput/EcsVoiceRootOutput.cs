@@ -74,6 +74,7 @@ namespace DataOrientedAudio.DSP.RootOutput
         public int GlobalVoiceIndex;
         public int ArchetypeIndex;
         public bool IsActive;
+        public int PlaybackPosition; // In samples
     }
 
     /// <summary>

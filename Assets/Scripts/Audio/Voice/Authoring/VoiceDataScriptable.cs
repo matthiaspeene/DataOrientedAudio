@@ -66,6 +66,8 @@ namespace DataOrientedAudio.Voice.Authoring
         #region bake helpers
         public bool UseRandomGain => _gainRange.Min != _gainRange.Max;
         public bool UseRandomPitch => _pitchRange.Min != _pitchRange.Max;
+        public bool UseRandomPlaybackPosition => _startPositionRange.Min != _startPositionRange.Max;
+
         #endregion
         private void OnValidate()
         {
@@ -120,6 +122,13 @@ namespace DataOrientedAudio.Voice.Authoring
         private float PitchToPlaybackSpeed(float pitch)
         {
             return Unity.Mathematics.math.pow(2f, pitch / 12f);
+        }
+
+        internal RandomRange GetPlaybackPositionRangeInSamples()
+        { // TODO: This isnt supporting multible clips.
+            return new RandomRange(
+                (int)_startPositionRange.Min * _clips[0].frequency,
+                (int)_startPositionRange.Max * _clips[0].frequency);
         }
     }
 }

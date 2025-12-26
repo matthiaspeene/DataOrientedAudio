@@ -72,6 +72,20 @@ namespace DataOrientedAudio.Voice.Runtime
 
     #endregion
 
+    #region Playback Position Components
+
+    public struct OutPlaybackStartPosition : IComponentData
+    {
+        public int Value; // In samples. Default is 0.
+    }
+
+    public struct RandomPlaybackPositionMod : IComponentData
+    {
+        public int Result; // Raw playback position in samples.
+    }
+
+    #endregion
+
     #region Spatialization Components
 
     // Data: If enabled, this voice follows a target entity.
@@ -124,7 +138,7 @@ namespace DataOrientedAudio.Voice.Runtime
     #endregion
 
     #region Shared Range Components
-
+    // TODO:  these ranged components should be unter their respective catagorys (Gain, Playback Speed, Playback Position)
     public struct VoiceRandomGainRange : ISharedComponentData
     {
         public float Min;
@@ -135,6 +149,12 @@ namespace DataOrientedAudio.Voice.Runtime
     {
         public float Min;
         public float Max;
+    }
+
+    public struct VoiceRandomPlaybackPositionRange : ISharedComponentData
+    {
+        public int Min;
+        public int Max;
     }
 
     #endregion

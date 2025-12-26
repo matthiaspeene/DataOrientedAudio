@@ -239,6 +239,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                                             GlobalVoiceIndex = globalIndex,
                                             ArchetypeIndex = cmd.ArchetypeIndex,
                                             IsActive = cmd.Value != 0f,
+                                            PlaybackPosition = cmd.PlaybackPosition
                                         });
                                         break;
 

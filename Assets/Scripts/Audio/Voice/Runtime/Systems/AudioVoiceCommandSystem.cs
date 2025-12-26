@@ -107,16 +107,19 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void ProcessStartRequests(NativeList<VoiceCommand> commands)
         {
-            foreach (var (archIdx, localIdx, startEnabled) in
-                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, EnabledRefRW<StartVoiceRequest>>())
+            foreach (var (archIdx, localIdx, startEnabled, position) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, EnabledRefRW<StartVoiceRequest>, RefRO<OutPlaybackStartPosition>>())
             {
                 commands.Add(new VoiceCommand
                 {
                     Type = VoiceCommandType.SetActive,
                     ArchetypeIndex = archIdx.ValueRO.Value,
                     LocalVoiceIndex = localIdx.ValueRO.Value,
-                    Value = 1.0f
+                    Value = 1.0f,
+                    PlaybackPosition = position.ValueRO.Value
                 });
+
+                UnityEngine.Debug.Log("AudioVoiceCommandSystem: " + archIdx.ValueRO.Value + " " + localIdx.ValueRO.Value + " " + position.ValueRO.Value); // If playback position is not 0 here why is it showing up as 0 in realtime?
 
                 startEnabled.ValueRW = false;
             }
