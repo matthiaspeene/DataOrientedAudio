@@ -28,6 +28,9 @@ namespace DataOrientedAudio.Voice.Authoring
         [Tooltip("Min/Max pitch multiplier. X = min, Y = max.")]
         [SerializeField] private RandomRange _pitchRange = new(0f, 0f);
 
+        [Tooltip("Min/Max start position in seconds range. X = min, Y = max.")]
+        [SerializeField] private RandomRange _startPositionRange = new(0f, 0f);
+
         [Header("Triggering")]
         [SerializeField] private Triggermode _triggermode = Triggermode.Once;
 
