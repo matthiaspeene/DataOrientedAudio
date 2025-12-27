@@ -15,10 +15,10 @@ namespace DataOrientedAudio.StressTest.Systems
             float currentTime = (float)SystemAPI.Time.ElapsedTime;
 
             foreach (var (voice, eventBuffer, transform, entity) in
-            SystemAPI.Query<RefRW<StressTestVoice>, DynamicBuffer<AudioEvent>, RefRO<LocalTransform>>().WithEntityAccess())
+                SystemAPI.Query<RefRW<StressTestVoice>, DynamicBuffer<AudioEvent>, RefRO<LocalTransform>>().WithEntityAccess())
             {
                 if (currentTime >= voice.ValueRO.NextTriggerTime)
-
+                {
                     if (SystemAPI.HasComponent<StressTestMovement>(entity))
                     {
                         eventBuffer.Add(new AudioEvent
@@ -38,7 +38,8 @@ namespace DataOrientedAudio.StressTest.Systems
                         });
                     }
 
-                voice.ValueRW.NextTriggerTime = float.MaxValue;
+                    voice.ValueRW.NextTriggerTime = float.MaxValue;
+                }
             }
         }
     }
