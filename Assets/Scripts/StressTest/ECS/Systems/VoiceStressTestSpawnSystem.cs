@@ -3,6 +3,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 using DataOrientedAudio.Events.Runtime;
+using Unity.Collections;
 
 namespace DataOrientedAudio.StressTest.Systems
 {
@@ -14,20 +15,21 @@ namespace DataOrientedAudio.StressTest.Systems
         /// </summary>
         public void IncreaseStressLevel()
         {
-            foreach (var (stressTest, configBuffer) in SystemAPI.Query<RefRW<VoiceStressTest>, DynamicBuffer<VoiceStressConfig>>())
+            if (SystemAPI.HasSingleton<VoiceStressTest>())
             {
-                IncreaseStressLevelInternal(ref stressTest.ValueRW, configBuffer);
-                return; // Only process first (singleton)
+                var entity = SystemAPI.GetSingletonEntity<VoiceStressTest>();
+                if (EntityManager.HasBuffer<VoiceStressConfig>(entity))
+                {
+                    var stressTest = SystemAPI.GetComponentRW<VoiceStressTest>(entity);
+                    var configBuffer = SystemAPI.GetBuffer<VoiceStressConfig>(entity);
+                    IncreaseStressLevelInternal(ref stressTest.ValueRW, configBuffer);
+                }
             }
         }
 
         protected override void OnUpdate()
         {
-            // Check for 'I' key press
-            if (Input.GetKeyDown(KeyCode.I))
-            {
-                IncreaseStressLevel();
-            }
+            //IncreaseStressLevel();
         }
 
         private void IncreaseStressLevelInternal(ref VoiceStressTest stressTest, DynamicBuffer<VoiceStressConfig> configBuffer)
@@ -45,7 +47,7 @@ namespace DataOrientedAudio.StressTest.Systems
 
             // Create random number generator with seed
             var random = new Unity.Mathematics.Random(stressTest.RandomSeed);
-            
+
             // Advance random state based on current step to get different results each time
             for (int i = 0; i < stressTest.CurrentStressStep; i++)
             {
@@ -53,9 +55,11 @@ namespace DataOrientedAudio.StressTest.Systems
             }
 
             // Spawn voices for each config
-            for (int i = 0; i < configBuffer.Length; i++)
+            // Copy to NativeArray to avoid invalidation during structural changes
+            using var localConfigs = configBuffer.ToNativeArray(Allocator.Temp);
+            for (int i = 0; i < localConfigs.Length; i++)
             {
-                var config = configBuffer[i];
+                var config = localConfigs[i];
                 int voicesToAddThisStep = config.AmountRatio;
 
                 // Enforce global 255 cap

@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Collections;
+using Unity.Mathematics;
 using DataOrientedAudio.Voice.Runtime;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
@@ -56,8 +57,24 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                         SystemAPI.SetComponentEnabled<VoiceActive>(entity, false);
                         SystemAPI.SetComponentEnabled<StopVoiceRequest>(entity, true);
 
-                        // Add to reclaim queue
-                        reclaimQueue.Enqueue(entity);
+                        // Handle Repeat Logic
+                        if (SystemAPI.HasComponent<TriggerRepeat>(entity))
+                        {
+                            var triggerRepeat = SystemAPI.GetComponent<TriggerRepeat>(entity);
+
+                            // Schedule next play
+                            var random = Unity.Mathematics.Random.CreateFromIndex((uint)(SystemAPI.Time.ElapsedTime * 10000.0) + 1 + (uint)localIdx.ValueRO.Value);
+                            float delay = random.NextFloat(triggerRepeat.DelayMin, triggerRepeat.DelayMax);
+
+                            triggerRepeat.NextRepetitionTime = SystemAPI.Time.ElapsedTime + delay;
+                            triggerRepeat.IsWaitingForRepeat = true;
+
+                            SystemAPI.SetComponent(entity, triggerRepeat);
+                        }
+                        else
+                        {
+                            reclaimQueue.Enqueue(entity);
+                        }
                     }
                 }
             }
@@ -118,8 +135,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                     Value = 1.0f,
                     PlaybackPosition = position.ValueRO.Value
                 });
-
-                UnityEngine.Debug.Log("AudioVoiceCommandSystem: " + archIdx.ValueRO.Value + " " + localIdx.ValueRO.Value + " " + position.ValueRO.Value); // If playback position is not 0 here why is it showing up as 0 in realtime?
 
                 startEnabled.ValueRW = false;
             }

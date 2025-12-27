@@ -26,10 +26,11 @@ namespace DataOrientedAudio.StressTest.Systems
                         AttachTo = Entity.Null
                     });
 
-                    // Schedule next trigger
-                    var random = Unity.Mathematics.Random.CreateFromIndex((uint)(voice.ValueRO.VoiceTypeHash ^ (int)(currentTime * 1000)));
-                    float repeatDelay = random.NextFloat(voice.ValueRO.RepeatDelayMin, voice.ValueRO.RepeatDelayMax);
-                    voice.ValueRW.NextTriggerTime = currentTime + repeatDelay;
+                    // Disable this trigger logic so it doesn't fire again for this entity
+                    // The entity remains alive for movement, but the audio triggering is handed off.
+                    // If we want it to trigger exactly once, we can just set NextTriggerTime to infinity or remove the component if possible.
+                    // For now, setting time to infinity effectively stops it.
+                    voice.ValueRW.NextTriggerTime = float.MaxValue;
                 }
             }
         }

@@ -145,6 +145,18 @@ namespace DataOrientedAudio.Voice.Authoring
                 // 6. Identity & Topology
                 AddComponent(voiceEntity, new VoiceLocalIndex { Value = v });
                 AddComponent(voiceEntity, new VoiceArchetypeIndex { Value = -1 }); // Assigned at runtime
+
+                // 7. Triggering
+                if (voiceData.TriggerMode == Triggermode.Repeat)
+                {
+                    AddComponent(voiceEntity, new TriggerRepeat
+                    {
+                        DelayMin = voiceData.RepeatDelayRange.x,
+                        DelayMax = voiceData.RepeatDelayRange.y,
+                        IsWaitingForRepeat = false,
+                        NextRepetitionTime = 0
+                    });
+                }
             }
         }
 

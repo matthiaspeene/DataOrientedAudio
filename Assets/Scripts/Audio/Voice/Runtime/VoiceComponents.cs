@@ -158,4 +158,16 @@ namespace DataOrientedAudio.Voice.Runtime
     }
 
     #endregion
+
+    #region Trigger Components
+
+    public struct TriggerRepeat : IComponentData
+    {
+        public float DelayMin;
+        public float DelayMax;
+        public double NextRepetitionTime;
+        public bool IsWaitingForRepeat;
+    }
+
+    #endregion
 }
