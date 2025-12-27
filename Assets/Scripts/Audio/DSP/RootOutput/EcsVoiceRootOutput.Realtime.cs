@@ -533,18 +533,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                         output[ch, f] = BusBuffers[baseIdx + ch];
                 }
 
-                    int channels = output.channelCount;
-                    for (int f = 0; f < output.frameCount; f++)
-                    {
-                        int baseIdx = f * channels;
-                        for (int ch = 0; ch < channels; ch++)
-                            output[ch, f] = BusBuffers[baseIdx + ch];
-                    }
-
-                    while (FinishedVoiceIndices.TryDequeue(out int idx))
-                    {
-                        pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
-                    }
                 while (FinishedVoiceIndices.TryDequeue(out int idx))
                 {
                     pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
