@@ -6,6 +6,7 @@ using DataOrientedAudio.DSP.RootOutput;
 using DataOrientedAudio.Voice.Runtime.Systems;
 using DataOrientedAudio.Voice.Runtime;
 using static UnityEngine.Audio.ProcessorInstance;
+using Unity.VisualScripting;
 
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 [UpdateAfter(typeof(AudioTopologySystem))] // Don’t start running until the topology system has created its singleton
@@ -54,7 +55,12 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}, " +
                   $"Archetypes={topology.MaxArchetypes}, Voices={topology.TotalVoices}");
 
-        EcsVoiceRootOutput.UseParallelScheduling.Data = false; // TODO we could use a manual togle somewhere
+#if PARALLELAUDIO
+        EcsVoiceRootOutput.UseParallelScheduling.Data = true;
+#else
+        EcsVoiceRootOutput.UseParallelScheduling.Data = false;
+#endif
+
     }
 
     protected override void OnUpdate()
