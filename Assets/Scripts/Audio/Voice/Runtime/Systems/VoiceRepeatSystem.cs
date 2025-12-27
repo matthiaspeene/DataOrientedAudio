@@ -12,8 +12,9 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         {
             double currentTime = SystemAPI.Time.ElapsedTime;
 
-            foreach (var (triggerRepeat, voiceActive, startRequest, stopRequest) in 
-                     SystemAPI.Query<RefRW<TriggerRepeat>, EnabledRefRW<VoiceActive>, EnabledRefRW<StartVoiceRequest>, EnabledRefRW<StopVoiceRequest>>())
+            foreach (var (triggerRepeat, voiceActive, startRequest, stopRequest) in
+                     SystemAPI.Query<RefRW<TriggerRepeat>, EnabledRefRW<VoiceActive>, EnabledRefRW<StartVoiceRequest>, EnabledRefRW<StopVoiceRequest>>()
+                         .WithOptions(EntityQueryOptions.IgnoreComponentEnabledState))
             {
                 if (triggerRepeat.ValueRO.IsWaitingForRepeat)
                 {
@@ -21,7 +22,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                     {
                         // Time to play!
                         triggerRepeat.ValueRW.IsWaitingForRepeat = false;
-                        
+
                         // Re-enable and start
                         voiceActive.ValueRW = true;
                         startRequest.ValueRW = true;

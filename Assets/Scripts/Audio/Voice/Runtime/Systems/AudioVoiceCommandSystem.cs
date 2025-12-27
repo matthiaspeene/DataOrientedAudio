@@ -53,10 +53,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
                     if (cmd.ArchetypeIndex == archIdx.ValueRO.Value && cmd.LocalVoiceIndex == localIdx.ValueRO.Value)
                     {
-                        // Match found
-                        SystemAPI.SetComponentEnabled<VoiceActive>(entity, false);
                         SystemAPI.SetComponentEnabled<StopVoiceRequest>(entity, true);
-
                         // Handle Repeat Logic
                         if (SystemAPI.HasComponent<TriggerRepeat>(entity))
                         {
@@ -74,6 +71,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                         else
                         {
                             reclaimQueue.Enqueue(entity);
+                            SystemAPI.SetComponentEnabled<VoiceActive>(entity, false);
                         }
                     }
                 }

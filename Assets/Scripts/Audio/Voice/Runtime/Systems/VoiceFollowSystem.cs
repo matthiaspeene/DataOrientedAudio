@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Transforms;
 using Unity.Mathematics;
+using Unity.Collections.LowLevel.Unsafe;
 using DataOrientedAudio.Common;
 using DataOrientedAudio.Voice.Runtime;
 
@@ -45,6 +46,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         #region Lookups
 
         [ReadOnly]
+        [NativeDisableContainerSafetyRestriction]
         public ComponentLookup<LocalTransform> TransformLookup;
 
         [ReadOnly]
