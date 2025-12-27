@@ -45,7 +45,7 @@ namespace DataOrientedAudio.Voice.Authoring
 
         [Header("Spatialization")]
         [SerializeField] private AudioEventSpace _space = AudioEventSpace.World3D;
-        [SerializeField] private AnimationCurve _distanceAttenuation = AnimationCurve.Linear(0f, 1f, 100f, 0f);
+        [SerializeField] private AnimationCurve _distanceAttenuation = AnimationCurve.Linear(0f, 1f, 20f, 0f);
 
         // --- Accessors ---
         public AudioClip[] Clips => _clips;

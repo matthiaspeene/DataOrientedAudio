@@ -35,16 +35,16 @@ MonoBehaviour:
       time: 0
       value: 1
       inSlope: 0
-      outSlope: -0.01
+      outSlope: 0
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 100
+      time: 30
       value: 0
       inSlope: -0.01
-      outSlope: 0
+      outSlope: -0.01
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
