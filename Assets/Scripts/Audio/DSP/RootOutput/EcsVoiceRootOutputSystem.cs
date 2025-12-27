@@ -53,6 +53,8 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         _created = ControlContext.builtIn.Exists(_instance);
         Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}, " +
                   $"Archetypes={topology.MaxArchetypes}, Voices={topology.TotalVoices}");
+
+        EcsVoiceRootOutput.UseParallelScheduling.Data = false; // TODO we could use a manual togle somewhere
     }
 
     protected override void OnUpdate()

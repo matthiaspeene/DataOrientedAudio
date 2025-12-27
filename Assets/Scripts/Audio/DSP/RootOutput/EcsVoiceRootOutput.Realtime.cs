@@ -16,6 +16,10 @@ namespace DataOrientedAudio.DSP.RootOutput
     [BurstCompile]
     public static partial class EcsVoiceRootOutput
     {
+        // Toggle for scheduling mode comparison
+        public static readonly SharedStatic<bool> UseParallelScheduling = SharedStatic<bool>.GetOrCreate<Realtime, ParallelSchedulingKey>();
+        private class ParallelSchedulingKey { }
+
         [BurstCompile(CompileSynchronously = true)]
         public struct Realtime : RootOutputInstance.IRealtime
         {
@@ -43,7 +47,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             internal NativeArray<float> PlaybackPositions;
             internal NativeQueue<int> FinishedVoiceIndices;
 
-            // Job handles
+            // Job handles - Restored for optional parallel execution
             internal NativeArray<JobHandle> BusJobHandles;
             JobHandle mixJobHandle;
 
@@ -245,7 +249,10 @@ namespace DataOrientedAudio.DSP.RootOutput
                     {
                         if (BusActiveArchetypes[bus].IsEmpty)
                         {
-                            BusJobHandles[bus] = default;
+                            if (EcsVoiceRootOutput.UseParallelScheduling.Data)
+                            {
+                                BusJobHandles[bus] = default;
+                            }
                             continue;
                         }
 
@@ -264,17 +271,32 @@ namespace DataOrientedAudio.DSP.RootOutput
                             FinishedVoices = FinishedVoiceIndices.AsParallelWriter()
                         };
 
-                        BusJobHandles[bus] = job.Schedule(input);
+                        if (EcsVoiceRootOutput.UseParallelScheduling.Data)
+                        {
+                            BusJobHandles[bus] = job.Schedule(input);
+                        }
+                        else
+                        {
+                            job.Run();
+                        }
                     }
 
-                    var combinedHandle = JobHandle.CombineDependencies(BusJobHandles);
-
-                    mixJobHandle = new MixJob
+                    var mixJob = new MixJob
                     {
                         Buffers = BusBuffers,
                         BusMeta = BusMeta,
                         BufferLength = BusMeta[0].Size
-                    }.Schedule(combinedHandle);
+                    };
+
+                    if (EcsVoiceRootOutput.UseParallelScheduling.Data)
+                    {
+                        var combined = JobHandle.CombineDependencies(BusJobHandles);
+                        mixJobHandle = mixJob.Schedule(combined);
+                    }
+                    else
+                    {
+                        mixJob.Run();
+                    }
                 }
             }
 
@@ -537,7 +559,10 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 using (s_EndProcessingMarker.Auto())
                 {
-                    mixJobHandle.Complete();
+                    if (EcsVoiceRootOutput.UseParallelScheduling.Data)
+                    {
+                        mixJobHandle.Complete();
+                    }
 
                     int channels = output.channelCount;
                     for (int f = 0; f < output.frameCount; f++)
@@ -565,14 +590,8 @@ namespace DataOrientedAudio.DSP.RootOutput
             public void RemovedFromProcessing()
             {
                 // Ensure any pending jobs are completed
-                if (mixJobHandle.IsCompleted == false)
-                    mixJobHandle.Complete();
-
-                for (int i = 0; i < BusJobHandles.Length; i++)
-                {
-                    if (BusJobHandles[i].IsCompleted == false)
-                        BusJobHandles[i].Complete();
-                }
+                if (mixJobHandle.IsCompleted == false) mixJobHandle.Complete();
+                for (int i = 0; i < BusJobHandles.Length; i++) { if (BusJobHandles[i].IsCompleted == false) BusJobHandles[i].Complete(); }
 
                 if (VoiceActiveFlags.IsCreated) VoiceActiveFlags.Dispose();
                 if (Gains.IsCreated) Gains.Dispose();

@@ -67,7 +67,7 @@ namespace DataOrientedAudio.DSP.RootOutput
                 var bufferSamples = format.bufferFrameCount * format.channelCount;
                 EnsureArray(ref realtime.BusMeta, _topology.MaxBuses);
                 EnsureArray(ref realtime.BusBuffers, bufferSamples * _topology.MaxBuses);
-                EnsureArray(ref realtime.BusJobHandles, _topology.MaxBuses);
+                //EnsureArray(ref realtime.BusJobHandles, _topology.MaxBuses);
 
                 EnsureNestedListArray(ref realtime.BusActiveArchetypes, _topology.MaxBuses);
                 EnsureNestedListArray(ref realtime.BusActiveVoices, _topology.MaxBuses);
@@ -133,7 +133,7 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                 if (realtime.BusMeta.IsCreated) realtime.BusMeta.Dispose();
                 if (realtime.BusBuffers.IsCreated) realtime.BusBuffers.Dispose();
-                if (realtime.BusJobHandles.IsCreated) realtime.BusJobHandles.Dispose();
+                //if (realtime.BusJobHandles.IsCreated) realtime.BusJobHandles.Dispose();
 
                 if (realtime.BusActiveArchetypes.IsCreated)
                 {
