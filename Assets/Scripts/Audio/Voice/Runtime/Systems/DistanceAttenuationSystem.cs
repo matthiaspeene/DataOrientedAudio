@@ -1,3 +1,4 @@
+
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -11,21 +12,24 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     /// Uses a simple linear falloff based on the baked Min/Max distance settings.
     /// </summary>
     [UpdateInGroup(typeof(AudioVoiceUpdateGroup))]
-    [UpdateBefore(typeof(VoiceGainSystem))]
     [BurstCompile]
     public partial struct DistanceAttenuationSystem : ISystem
     {
-        [BurstCompile]
+        private EntityQuery _query;
+
         public void OnCreate(ref SystemState state)
         {
             // We need an AudioListener to calculate distance
             state.RequireForUpdate<AudioListener>();
 
-            // We only process voices that have the attenuation components and are active
-            var query = SystemAPI.QueryBuilder()
-                .WithAll<VoiceActive, DistanceAttenuationSettings, DistanceAttenuationGainMod, LocalTransform>()
-                .Build();
-            state.RequireForUpdate(query);
+            _query = new EntityQueryBuilder(Allocator.Temp)
+                .WithAll<VoiceActive>()
+                .WithAll<DistanceAttenuationSettings>()
+                .WithAll<DistanceAttenuationGainMod>()
+                .WithAll<LocalTransform>()
+                .Build(ref state);
+
+            state.RequireForUpdate(_query);
         }
 
         [BurstCompile]
@@ -42,12 +46,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 LocalTransformHandle = SystemAPI.GetComponentTypeHandle<LocalTransform>(true)
             };
 
-            state.Dependency = job.ScheduleParallel(state.GetEntityQuery(
-                typeof(VoiceActive),
-                ComponentType.ReadOnly<DistanceAttenuationSettings>(),
-                typeof(DistanceAttenuationGainMod),
-                ComponentType.ReadOnly<LocalTransform>()),
-                state.Dependency);
+            state.Dependency = job.ScheduleParallel(_query, state.Dependency);
         }
     }
 
