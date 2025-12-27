@@ -182,5 +182,8 @@ namespace DataOrientedAudio.Voice.Runtime
         public bool IsWaitingForRepeat;
     }
 
+    public struct GainChanged : IComponentData, IEnableableComponent { }
+
+
     #endregion
 }

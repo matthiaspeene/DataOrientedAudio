@@ -22,6 +22,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             // We want to process entities that have OutChannelGain AND at least one of the modifiers.
             _query = new EntityQueryBuilder(Allocator.Temp)
                 .WithAllRW<OutChannelGain>()
+                .WithAllRW<GainChanged>()
                 .WithAny<MixGainMod, RandomGainMod, SpatializationChannelGains, DistanceAttenuationGainMod>()
                 .Build(ref state);
 
@@ -53,7 +54,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
         [ReadOnly] public BufferLookup<SpatializationChannelGains> SpatialGainsLookup;
         public uint LastSystemVersion;
 
-        public void Execute(Entity entity, DynamicBuffer<OutChannelGain> outGains)
+        public void Execute(Entity entity, DynamicBuffer<OutChannelGain> outGains, EnabledRefRW<GainChanged> gainChanged)
         {
             // Efficiency check: only proceed if any relevant component has changed.
             bool changed = false;
@@ -96,14 +97,23 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
                 for (int i = 0; i < count; i++)
                 {
-                    outGains[i] = new OutChannelGain { Value = baseGain * sGains[i].Value };
+                    float newValue = baseGain * sGains[i].Value;
+                    if (math.abs(outGains[i].Value - newValue) > 1e-5f)
+                    {
+                        outGains[i] = new OutChannelGain { Value = newValue };
+                        gainChanged.ValueRW = true;
+                    }
                 }
             }
             else
             {
                 for (int i = 0; i < outGains.Length; i++)
                 {
-                    outGains[i] = new OutChannelGain { Value = baseGain };
+                    if (math.abs(outGains[i].Value - baseGain) > 1e-5f)
+                    {
+                        outGains[i] = new OutChannelGain { Value = baseGain };
+                        gainChanged.ValueRW = true;
+                    }
                 }
             }
         }

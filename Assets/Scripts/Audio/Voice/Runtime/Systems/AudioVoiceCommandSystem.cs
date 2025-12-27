@@ -86,10 +86,12 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void ProcessGainChanges(NativeList<VoiceCommand> commands)
         {
-            foreach (var (archIdx, localIdx, gainBuffer) in
-                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, DynamicBuffer<OutChannelGain>>()
-                         .WithChangeFilter<OutChannelGain>())
+            //int gainCount = 0;
+            foreach (var (archIdx, localIdx, gainBuffer, gainChanged) in
+                     SystemAPI.Query<RefRO<VoiceArchetypeIndex>, RefRO<VoiceLocalIndex>, DynamicBuffer<OutChannelGain>, EnabledRefRW<GainChanged>>()
+                         .WithAll<GainChanged>())
             {
+                //gainCount += gainBuffer.Length;
                 for (int i = 0; i < gainBuffer.Length; i++)
                 {
                     commands.Add(new VoiceCommand
@@ -101,7 +103,11 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                         Value = gainBuffer[i].Value
                     });
                 }
+
+                // Reset the flag so we don't process this again until next change
+                gainChanged.ValueRW = false;
             }
+            //UnityEngine.Debug.Log($"[AudioVoiceCommandSystem] Processed {gainCount} gain changes");
         }
 
         private void ProcessPlaybackSpeedChanges(NativeList<VoiceCommand> commands)

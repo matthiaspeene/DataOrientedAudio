@@ -74,12 +74,16 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
                 if (!hasRange)
                 {
-                    gainMods[i] = new DistanceAttenuationGainMod { Value = distance < settings.MaxDistance ? 1f : 0f };
+                    float newVal = distance < settings.MaxDistance ? 1f : 0f;
+                    if (math.abs(gainMods[i].Value - newVal) > 1e-5f)
+                        gainMods[i] = new DistanceAttenuationGainMod { Value = newVal };
                     continue;
                 }
 
                 float t = math.saturate((distance - settings.MinDistance) / range);
-                gainMods[i] = new DistanceAttenuationGainMod { Value = 1f - t };
+                float finalVal = 1f - t;
+                if (math.abs(gainMods[i].Value - finalVal) > 1e-5f)
+                    gainMods[i] = new DistanceAttenuationGainMod { Value = finalVal };
             }
         }
     }
