@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using Unity.Entities;
+using DataOrientedAudio.StressTest.Systems;
 
 namespace DataOrientedAudio.StressTest
 {
@@ -58,7 +60,9 @@ namespace DataOrientedAudio.StressTest
             }
             else if (testMode == TestMode.ECS)
             {
-                //voiceStressECS.IncreaseStressLevel(); //TBA
+                var world = World.DefaultGameObjectInjectionWorld;
+                var system = world?.GetExistingSystemManaged<VoiceStressTestSpawnSystem>();
+                system?.IncreaseStressLevel();
             }
         }
     }
