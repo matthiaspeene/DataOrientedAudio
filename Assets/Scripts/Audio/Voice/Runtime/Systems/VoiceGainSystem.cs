@@ -24,6 +24,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 .WithAllRW<OutChannelGain>()
                 .WithAllRW<GainChanged>()
                 .WithAny<MixGainMod, RandomGainMod, SpatializationChannelGains, DistanceAttenuationGainMod>()
+                .WithOptions(EntityQueryOptions.IgnoreComponentEnabledState)
                 .Build(ref state);
 
             state.RequireForUpdate(_query);
