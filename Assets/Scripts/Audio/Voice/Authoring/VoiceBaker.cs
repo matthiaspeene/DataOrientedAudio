@@ -104,6 +104,25 @@ namespace DataOrientedAudio.Voice.Authoring
                     });
                 }
 
+                // 3a. Distance Attenuation
+                // We extract the linear falloff range from the start and end of the curve:
+                // Start key time = MinDistance, End key time = MaxDistance.
+                if (voiceData.DistanceAttenuation != null && voiceData.DistanceAttenuation.length >= 2)
+                {
+                    Keyframe firstKey = voiceData.DistanceAttenuation[0];
+                    Keyframe lastKey = voiceData.DistanceAttenuation[voiceData.DistanceAttenuation.length - 1];
+
+                    // Add settings
+                    AddSharedComponent(voiceEntity, new DistanceAttenuationSettings
+                    {
+                        MinDistance = firstKey.time,
+                        MaxDistance = lastKey.time
+                    });
+
+                    // Add runtime gain modifier (default to 1.0 until system updates it)
+                    AddComponent(voiceEntity, new DistanceAttenuationGainMod { Value = 1f });
+                }
+
                 // 3b. Playback Position
                 RandomRange randomPlaybackPositionRange = voiceData.GetPlaybackPositionRangeInSamples();
                 AddComponent(voiceEntity, new OutPlaybackStartPosition { Value = (int)randomPlaybackPositionRange.Min });

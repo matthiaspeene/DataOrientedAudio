@@ -22,7 +22,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             // We want to process entities that have OutChannelGain AND at least one of the modifiers.
             _query = new EntityQueryBuilder(Allocator.Temp)
                 .WithAllRW<OutChannelGain>()
-                .WithAny<MixGainMod, RandomGainMod, SpatializationChannelGains>()
+                .WithAny<MixGainMod, RandomGainMod, SpatializationChannelGains, DistanceAttenuationGainMod>()
                 .Build(ref state);
 
             state.RequireForUpdate(_query);
@@ -35,6 +35,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             {
                 MixGainLookup = SystemAPI.GetComponentLookup<MixGainMod>(true),
                 RandomGainLookup = SystemAPI.GetComponentLookup<RandomGainMod>(true),
+                DistanceAttenLookup = SystemAPI.GetComponentLookup<DistanceAttenuationGainMod>(true),
                 SpatialGainsLookup = SystemAPI.GetBufferLookup<SpatializationChannelGains>(true),
                 LastSystemVersion = state.LastSystemVersion
             };
@@ -48,6 +49,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     {
         [ReadOnly] public ComponentLookup<MixGainMod> MixGainLookup;
         [ReadOnly] public ComponentLookup<RandomGainMod> RandomGainLookup;
+        [ReadOnly] public ComponentLookup<DistanceAttenuationGainMod> DistanceAttenLookup;
         [ReadOnly] public BufferLookup<SpatializationChannelGains> SpatialGainsLookup;
         public uint LastSystemVersion;
 
@@ -59,6 +61,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (MixGainLookup.HasComponent(entity) && MixGainLookup.DidChange(entity, LastSystemVersion))
                 changed = true;
             else if (RandomGainLookup.HasComponent(entity) && RandomGainLookup.DidChange(entity, LastSystemVersion))
+                changed = true;
+            else if (DistanceAttenLookup.HasComponent(entity) && DistanceAttenLookup.DidChange(entity, LastSystemVersion))
                 changed = true;
             else if (SpatialGainsLookup.HasBuffer(entity) && SpatialGainsLookup.DidChange(entity, LastSystemVersion))
                 changed = true;
@@ -77,6 +81,11 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (RandomGainLookup.HasComponent(entity))
             {
                 baseGain *= RandomGainLookup[entity].Result;
+            }
+
+            if (DistanceAttenLookup.HasComponent(entity))
+            {
+                baseGain *= DistanceAttenLookup[entity].Value;
             }
 
             // 2. Apply spatialization gains or just base gain to all channels

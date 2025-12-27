@@ -24,6 +24,19 @@ namespace DataOrientedAudio.Voice.Runtime
         public float Value;
     }
 
+    // Gain calculated based on distance from listener.
+    public struct DistanceAttenuationGainMod : IComponentData
+    {
+        public float Value;
+    }
+
+    // Settings for distance attenuation (baked from AnimationCurve).
+    public struct DistanceAttenuationSettings : ISharedComponentData
+    {
+        public float MinDistance;
+        public float MaxDistance;
+    }
+
     /* TODO:
     // Example of future modulator hookup.
     public struct GainModulatorMod : IComponentData

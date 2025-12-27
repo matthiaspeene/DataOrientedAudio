@@ -45,6 +45,7 @@ namespace DataOrientedAudio.Voice.Authoring
 
         [Header("Spatialization")]
         [SerializeField] private AudioEventSpace _space = AudioEventSpace.World3D;
+        [SerializeField] private AnimationCurve _distanceAttenuation = AnimationCurve.Linear(0f, 1f, 100f, 0f);
 
         // --- Accessors ---
         public AudioClip[] Clips => _clips;
@@ -55,6 +56,7 @@ namespace DataOrientedAudio.Voice.Authoring
         public int MaxVoices => _maxVoices;
         public AudioEventSpace Space => _space;
         public int MixBusIndex => (int)_bus;
+        public AnimationCurve DistanceAttenuation => _distanceAttenuation;
 
         public RandomRange GetPitchAsPlaybackSpeedRange()
         {
