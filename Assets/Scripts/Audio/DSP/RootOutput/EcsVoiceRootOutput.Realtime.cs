@@ -549,7 +549,6 @@ namespace DataOrientedAudio.DSP.RootOutput
 
                     while (FinishedVoiceIndices.TryDequeue(out int idx))
                     {
-                        // Set active to false
                         pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
                     }
                 }
