@@ -107,7 +107,7 @@ namespace DataOrientedAudio.Voice.Authoring
                 // 3a. Distance Attenuation
                 // We extract the linear falloff range from the start and end of the curve:
                 // Start key time = MinDistance, End key time = MaxDistance.
-                if (voiceData.DistanceAttenuation != null && voiceData.DistanceAttenuation.length >= 2)
+                if (voiceData.DistanceAttenuation != null && voiceData.DistanceAttenuation.length >= 2 && voiceData.Space != AudioEventSpace.Stereo2D)
                 {
                     Keyframe firstKey = voiceData.DistanceAttenuation[0];
                     Keyframe lastKey = voiceData.DistanceAttenuation[voiceData.DistanceAttenuation.length - 1];
