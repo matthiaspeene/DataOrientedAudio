@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Entities;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Audio;
 using static UnityEngine.Audio.ProcessorInstance;
@@ -45,6 +46,11 @@ namespace DataOrientedAudio.DSP.RootOutput
             // Job handles
             internal NativeArray<JobHandle> BusJobHandles;
             JobHandle mixJobHandle;
+
+            // Profiler markers
+            static readonly ProfilerMarker s_UpdateMarker = new ProfilerMarker(ProfilerCategory.Audio, "EcsVoiceRootOutput.Realtime.Update");
+            static readonly ProfilerMarker s_ProcessMarker = new ProfilerMarker(ProfilerCategory.Audio, "EcsVoiceRootOutput.Realtime.Process");
+            static readonly ProfilerMarker s_EndProcessingMarker = new ProfilerMarker(ProfilerCategory.Audio, "EcsVoiceRootOutput.Realtime.EndProcessing");
 
             #endregion
 
@@ -142,82 +148,85 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Update(UpdatedDataContext context, Pipe pipe)
             {
-                foreach (var element in pipe.GetAvailableData(context))
+                using (s_UpdateMarker.Auto())
                 {
-                    if (element.TryGetData(out RegisterArchetypeMessage reg))
+                    foreach (var element in pipe.GetAvailableData(context))
                     {
-                        Archetypes[reg.ArchetypeIndex] = new ArchetypeMeta
+                        if (element.TryGetData(out RegisterArchetypeMessage reg))
                         {
-                            Blob = reg.Blob,
-                            Start = reg.Start,
-                            Count = reg.Count
-                        };
-                    }
-
-                    if (element.TryGetData(out SetVoiceGainMessage gain))
-                    {
-                        int idx = gain.GlobalVoiceIndex * Format.channelCount + gain.ChannelIndex;
-                        Gains[idx] = gain.Value;
-                    }
-
-                    if (element.TryGetData(out SetVoicePlaybackSpeedMessage speedMsg))
-                    {
-                        PlaybackSpeeds[speedMsg.GlobalVoiceIndex] = speedMsg.Value;
-                    }
-
-                    if (element.TryGetData(out SetVoiceActiveMessage active))
-                    {
-                        bool newState = active.IsActive;
-                        bool oldState = VoiceActiveFlags[active.GlobalVoiceIndex];
-                        if (oldState == newState) continue;
-
-                        VoiceActiveFlags[active.GlobalVoiceIndex] = newState;
-
-                        // If voice is becoming active, initialize previous gains to current (target) gains
-                        // to avoid smoothing from zero/stale values.
-                        if (newState)
-                        {
-                            int baseIdx = active.GlobalVoiceIndex * Format.channelCount;
-                            for (int ch = 0; ch < Format.channelCount; ch++)
+                            Archetypes[reg.ArchetypeIndex] = new ArchetypeMeta
                             {
-                                PreviousGains[baseIdx + ch] = Gains[baseIdx + ch];
-                            }
+                                Blob = reg.Blob,
+                                Start = reg.Start,
+                                Count = reg.Count
+                            };
                         }
 
-                        // Safety check: if the archetype isn't registered yet, we can't determine the bus.
-                        // This can happen during startup before the bootstrap message arrives.
-                        var arch = Archetypes[active.ArchetypeIndex];
-                        if (!arch.Blob.IsCreated)
+                        if (element.TryGetData(out SetVoiceGainMessage gain))
                         {
-                            UnityEngine.Debug.LogWarning($"[EcsVoiceRootOutput] Voice activated for archetype {active.ArchetypeIndex} but it's not registered yet. Defaulting to Bus 0.");
+                            int idx = gain.GlobalVoiceIndex * Format.channelCount + gain.ChannelIndex;
+                            Gains[idx] = gain.Value;
                         }
 
-                        int busIndex = arch.Blob.IsCreated ? arch.Blob.Value.OutputBusIndex : 0;
-                        var busVoiceList = BusActiveVoices[busIndex];
-                        var busArchetypeList = BusActiveArchetypes[busIndex];
-
-                        if (newState)
+                        if (element.TryGetData(out SetVoicePlaybackSpeedMessage speedMsg))
                         {
-                            busVoiceList.Add(active.GlobalVoiceIndex);
-                            busArchetypeList.Add(active.ArchetypeIndex);
-
-                            // Set playback position from the message
-                            PlaybackPositions[active.GlobalVoiceIndex] = active.PlaybackPosition;
-                            //UnityEngine.Debug.Log("PlaybackPositions[" + active.GlobalVoiceIndex + "] = " + active.PlaybackPosition);
+                            PlaybackSpeeds[speedMsg.GlobalVoiceIndex] = speedMsg.Value;
                         }
-                        else
+
+                        if (element.TryGetData(out SetVoiceActiveMessage active))
                         {
-                            int listIdx = busVoiceList.IndexOf(active.GlobalVoiceIndex);
-                            if (listIdx != -1)
+                            bool newState = active.IsActive;
+                            bool oldState = VoiceActiveFlags[active.GlobalVoiceIndex];
+                            if (oldState == newState) continue;
+
+                            VoiceActiveFlags[active.GlobalVoiceIndex] = newState;
+
+                            // If voice is becoming active, initialize previous gains to current (target) gains
+                            // to avoid smoothing from zero/stale values.
+                            if (newState)
                             {
-                                busVoiceList.RemoveAtSwapBack(listIdx);
-                                busArchetypeList.RemoveAtSwapBack(listIdx);
+                                int baseIdx = active.GlobalVoiceIndex * Format.channelCount;
+                                for (int ch = 0; ch < Format.channelCount; ch++)
+                                {
+                                    PreviousGains[baseIdx + ch] = Gains[baseIdx + ch];
+                                }
                             }
-                        }
 
-                        // Write back modified list structs to the array
-                        BusActiveVoices[busIndex] = busVoiceList;
-                        BusActiveArchetypes[busIndex] = busArchetypeList;
+                            // Safety check: if the archetype isn't registered yet, we can't determine the bus.
+                            // This can happen during startup before the bootstrap message arrives.
+                            var arch = Archetypes[active.ArchetypeIndex];
+                            if (!arch.Blob.IsCreated)
+                            {
+                                UnityEngine.Debug.LogWarning($"[EcsVoiceRootOutput] Voice activated for archetype {active.ArchetypeIndex} but it's not registered yet. Defaulting to Bus 0.");
+                            }
+
+                            int busIndex = arch.Blob.IsCreated ? arch.Blob.Value.OutputBusIndex : 0;
+                            var busVoiceList = BusActiveVoices[busIndex];
+                            var busArchetypeList = BusActiveArchetypes[busIndex];
+
+                            if (newState)
+                            {
+                                busVoiceList.Add(active.GlobalVoiceIndex);
+                                busArchetypeList.Add(active.ArchetypeIndex);
+
+                                // Set playback position from the message
+                                PlaybackPositions[active.GlobalVoiceIndex] = active.PlaybackPosition;
+                                //UnityEngine.Debug.Log("PlaybackPositions[" + active.GlobalVoiceIndex + "] = " + active.PlaybackPosition);
+                            }
+                            else
+                            {
+                                int listIdx = busVoiceList.IndexOf(active.GlobalVoiceIndex);
+                                if (listIdx != -1)
+                                {
+                                    busVoiceList.RemoveAtSwapBack(listIdx);
+                                    busArchetypeList.RemoveAtSwapBack(listIdx);
+                                }
+                            }
+
+                            // Write back modified list structs to the array
+                            BusActiveVoices[busIndex] = busVoiceList;
+                            BusActiveArchetypes[busIndex] = busArchetypeList;
+                        }
                     }
                 }
             }
@@ -228,42 +237,45 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Process(in RealtimeContext context, Pipe pipe, JobHandle input)
             {
-                BusBuffers.Fill(0f);
-
-                for (int bus = 0; bus < BusMeta.Length; bus++)
+                using (s_ProcessMarker.Auto())
                 {
-                    if (BusActiveArchetypes[bus].IsEmpty)
+                    BusBuffers.Fill(0f);
+
+                    for (int bus = 0; bus < BusMeta.Length; bus++)
                     {
-                        BusJobHandles[bus] = default;
-                        continue;
+                        if (BusActiveArchetypes[bus].IsEmpty)
+                        {
+                            BusJobHandles[bus] = default;
+                            continue;
+                        }
+
+                        var job = new BusMixJob
+                        {
+                            BusMeta = BusMeta[bus],
+                            Archetypes = Archetypes,
+                            ActiveArchetypes = BusActiveArchetypes[bus].AsArray(),
+                            ActiveVoices = BusActiveVoices[bus].AsArray(),
+                            PlaybackPositions = PlaybackPositions,
+                            PlaybackSpeeds = PlaybackSpeeds,
+                            Gains = Gains,
+                            PreviousGains = PreviousGains,
+                            Format = Format,
+                            OutputBuffer = BusBuffers,
+                            FinishedVoices = FinishedVoiceIndices.AsParallelWriter()
+                        };
+
+                        BusJobHandles[bus] = job.Schedule(input);
                     }
 
-                    var job = new BusMixJob
+                    var combinedHandle = JobHandle.CombineDependencies(BusJobHandles);
+
+                    mixJobHandle = new MixJob
                     {
-                        BusMeta = BusMeta[bus],
-                        Archetypes = Archetypes,
-                        ActiveArchetypes = BusActiveArchetypes[bus].AsArray(),
-                        ActiveVoices = BusActiveVoices[bus].AsArray(),
-                        PlaybackPositions = PlaybackPositions,
-                        PlaybackSpeeds = PlaybackSpeeds,
-                        Gains = Gains,
-                        PreviousGains = PreviousGains,
-                        Format = Format,
-                        OutputBuffer = BusBuffers,
-                        FinishedVoices = FinishedVoiceIndices.AsParallelWriter()
-                    };
-
-                    BusJobHandles[bus] = job.Schedule(input);
+                        Buffers = BusBuffers,
+                        BusMeta = BusMeta,
+                        BufferLength = BusMeta[0].Size
+                    }.Schedule(combinedHandle);
                 }
-
-                var combinedHandle = JobHandle.CombineDependencies(BusJobHandles);
-
-                mixJobHandle = new MixJob
-                {
-                    Buffers = BusBuffers,
-                    BusMeta = BusMeta,
-                    BufferLength = BusMeta[0].Size
-                }.Schedule(combinedHandle);
             }
 
             #endregion
@@ -523,15 +535,9 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void EndProcessing(in RealtimeContext context, Pipe pipe, ChannelBuffer output)
             {
-                mixJobHandle.Complete();
-
-                int channels = output.channelCount;
-                for (int f = 0; f < output.frameCount; f++)
+                using (s_EndProcessingMarker.Auto())
                 {
-                    int baseIdx = f * channels;
-                    for (int ch = 0; ch < channels; ch++)
-                        output[ch, f] = BusBuffers[baseIdx + ch];
-                }
+                    mixJobHandle.Complete();
 
                     int channels = output.channelCount;
                     for (int f = 0; f < output.frameCount; f++)
@@ -545,9 +551,6 @@ namespace DataOrientedAudio.DSP.RootOutput
                     {
                         pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
                     }
-                while (FinishedVoiceIndices.TryDequeue(out int idx))
-                {
-                    pipe.SendData(context, new VoiceFinishedMessage { GlobalVoiceIndex = idx });
                 }
             }
 
