@@ -1,6 +1,7 @@
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Collections;
 using Unity.Transforms;
 
 namespace DataOrientedAudio.Voice.Runtime.Systems
