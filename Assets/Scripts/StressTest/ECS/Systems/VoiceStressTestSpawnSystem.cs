@@ -39,11 +39,13 @@ namespace DataOrientedAudio.StressTest.Systems
 
             int totalSpawnedSoFar = stressTest.TotalVoicesSpawned;
 
+            /* ECS has no cap. Cap is defined by the audio engine.
             if (totalSpawnedSoFar >= 255)
             {
                 Debug.LogWarning("VoiceStressTestSpawnSystem: Reached cap of 255 voices. Cannot increase stress further.");
                 return;
             }
+*/
 
             // Create random number generator with seed
             var random = new Unity.Mathematics.Random(stressTest.RandomSeed);
