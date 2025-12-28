@@ -21,4 +21,5 @@ MonoBehaviour:
     maxSpeed: 0
     maxStartDelay: 0
     maxConcurrentVoices: 1000
+  visualPrefab: {fileID: 0}
   movementBounds: {x: 20, y: 10, z: 20}
