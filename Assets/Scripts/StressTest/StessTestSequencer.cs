@@ -3,6 +3,7 @@ using UnityEngine.SceneManagement;
 using System.Collections;
 using Unity.Entities;
 using DataOrientedAudio.StressTest.Systems;
+using UnityEngine.InputSystem;
 
 namespace DataOrientedAudio.StressTest
 {
@@ -14,6 +15,7 @@ namespace DataOrientedAudio.StressTest
     public class StessTestSequencer : MonoBehaviour
     {
         [SerializeField] private TestMode testMode;
+        [SerializeField] private bool manual;
         [SerializeField] private string nextScene;
         [SerializeField] private float startupDelay = 5f;
         [SerializeField] private int steps = 20;
@@ -30,7 +32,24 @@ namespace DataOrientedAudio.StressTest
 
         private void Start()
         {
-            StartCoroutine(Sequence());
+            if (!manual)
+            {
+                StartCoroutine(Sequence());
+            }
+        }
+
+        private void Update()
+        {
+            if (Keyboard.current == null) return;
+
+            if (Keyboard.current.spaceKey.wasPressedThisFrame)
+            {
+                IncreaseStressLevel();
+            }
+            if (Keyboard.current.nKey.wasPressedThisFrame)
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(nextScene);
+            }
         }
 
         private IEnumerator Sequence()

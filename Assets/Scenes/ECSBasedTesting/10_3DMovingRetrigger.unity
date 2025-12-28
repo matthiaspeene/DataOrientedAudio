@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.StressTest.StessTestSequencer
   testMode: 1
+  manual: 1
   nextScene: 11_LowVarience
   startupDelay: 5
   steps: 20
