@@ -122,7 +122,6 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             AssignArchetypeIndices(voiceTypeData.SortedTypeIds);
             CreateOrUpdateSingleton();
 
-            var busCount = 1; // TODO: This is not correct, we need to count the number of buses in the topology
 
             _isInitialized = true;
 
