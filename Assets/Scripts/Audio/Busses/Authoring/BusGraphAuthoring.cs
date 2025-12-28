@@ -1,5 +1,5 @@
 using UnityEngine;
-using DataOrientedAudio.Busses;
+using DataOrientedAudio.Busses.Authoring;
 
 namespace DataOrientedAudio.Busses.Authoring
 {

@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 using UnityEngine;
 
@@ -26,4 +25,3 @@ namespace DataOrientedAudio.Busses.Authoring
         [Serializable] public struct CategoryRouteDef { public string category; public string busGuid; }
     }
 }
-#endif
