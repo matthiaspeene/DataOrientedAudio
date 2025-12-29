@@ -37,16 +37,6 @@ namespace DataOrientedAudio.StressTest.Systems
             // Increment step
             stressTest.CurrentStressStep++;
 
-            int totalSpawnedSoFar = stressTest.TotalVoicesSpawned;
-
-            /* ECS has no cap. Cap is defined by the audio engine.
-            if (totalSpawnedSoFar >= 255)
-            {
-                Debug.LogWarning("VoiceStressTestSpawnSystem: Reached cap of 255 voices. Cannot increase stress further.");
-                return;
-            }
-*/
-
             // Create random number generator with seed
             var random = new Unity.Mathematics.Random(stressTest.RandomSeed);
 
@@ -64,31 +54,11 @@ namespace DataOrientedAudio.StressTest.Systems
                 var config = localConfigs[i];
                 int voicesToAddThisStep = config.AmountRatio;
 
-                // Enforce global 255 cap
-                int maxAllowedMore = 255 - totalSpawnedSoFar;
-
-                if (voicesToAddThisStep > maxAllowedMore)
-                {
-                    voicesToAddThisStep = maxAllowedMore;
-                }
-
                 SpawnVoicesOfType(ref random, config, voicesToAddThisStep, stressTest.MovementBounds);
-
-                totalSpawnedSoFar += voicesToAddThisStep;
-
-                if (totalSpawnedSoFar >= 255)
-                {
-                    Debug.LogWarning("VoiceStressTestSpawnSystem: Reached cap of 255 voices. Cannot increase stress further.");
-                    break;
-                }
             }
-
-            stressTest.TotalVoicesSpawned = totalSpawnedSoFar;
 
             // Update seed for next iteration
             stressTest.RandomSeed = random.NextUInt();
-
-            Debug.Log($"VoiceStressTestSpawnSystem: Increased stress level to step {stressTest.CurrentStressStep}. Currently spawned voices: {totalSpawnedSoFar}.");
         }
 
         private void SpawnVoicesOfType(ref Unity.Mathematics.Random random, VoiceStressConfig config, int count, float3 bounds)
