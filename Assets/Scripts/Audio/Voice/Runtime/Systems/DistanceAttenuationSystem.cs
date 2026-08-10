@@ -16,6 +16,9 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     public partial struct DistanceAttenuationSystem : ISystem
     {
         private EntityQuery _query;
+        private SharedComponentTypeHandle<DistanceAttenuationSettings> _distanceAttenSettingsHandle;
+        private ComponentTypeHandle<DistanceAttenuationGainMod> _distanceAttenGainModHandle;
+        private ComponentTypeHandle<LocalTransform> _localTransformHandle;
 
         public void OnCreate(ref SystemState state)
         {
@@ -29,6 +32,10 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 .WithAll<LocalTransform>()
                 .Build(ref state);
 
+            _distanceAttenSettingsHandle = state.GetSharedComponentTypeHandle<DistanceAttenuationSettings>();
+            _distanceAttenGainModHandle = state.GetComponentTypeHandle<DistanceAttenuationGainMod>(false);
+            _localTransformHandle = state.GetComponentTypeHandle<LocalTransform>(true);
+
             state.RequireForUpdate(_query);
         }
 
@@ -38,12 +45,16 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (!SystemAPI.TryGetSingleton<AudioListener>(out var listener))
                 return;
 
+            _distanceAttenSettingsHandle.Update(ref state);
+            _distanceAttenGainModHandle.Update(ref state);
+            _localTransformHandle.Update(ref state);
+
             var job = new DistanceAttenuationJob
             {
                 ListenerPosition = listener.Position,
-                DistanceAttenSettingsHandle = state.GetSharedComponentTypeHandle<DistanceAttenuationSettings>(),
-                DistanceAttenGainModHandle = SystemAPI.GetComponentTypeHandle<DistanceAttenuationGainMod>(false),
-                LocalTransformHandle = SystemAPI.GetComponentTypeHandle<LocalTransform>(true)
+                DistanceAttenSettingsHandle = _distanceAttenSettingsHandle,
+                DistanceAttenGainModHandle = _distanceAttenGainModHandle,
+                LocalTransformHandle = _localTransformHandle
             };
 
             state.Dependency = job.ScheduleParallel(_query, state.Dependency);
