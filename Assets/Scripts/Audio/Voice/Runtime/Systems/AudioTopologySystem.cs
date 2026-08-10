@@ -87,8 +87,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
                 totalVoiceCount = lastArchetype.Start + lastArchetype.Count;
             }
 
-            UnityEngine.Debug.Log($"[AudioTopologySystem] Returning topology with {totalVoiceCount} voices " +
-                                  $"across {_archetypes.Length} archetypes");
+            //UnityEngine.Debug.Log($"[AudioTopologySystem] Returning topology with {totalVoiceCount} voices " +
+            //                      $"across {_archetypes.Length} archetypes");
 
             return new AudioTopologyData
             {

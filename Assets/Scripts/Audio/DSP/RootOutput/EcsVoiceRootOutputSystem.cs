@@ -57,8 +57,8 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         _instance = ControlContext.builtIn.AllocateRootOutput(realtime, control, creationParams);
 
         _created = ControlContext.builtIn.Exists(_instance);
-        Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}, " +
-                  $"Archetypes={topology.MaxArchetypes}, Voices={topology.TotalVoices}");
+        //Debug.Log($"[EcsVoiceRootOutputSystem] Allocated root output. Exists={_created}, " +
+        //          $"Archetypes={topology.MaxArchetypes}, Voices={topology.TotalVoices}");
 
 #if PARALLELAUDIO
         EcsVoiceRootOutput.UseParallelScheduling.Data = true;
@@ -79,7 +79,7 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
 
     protected override void OnDestroy()
     {
-        Debug.Log("[EcsVoiceRootOutputSystem] OnDestroy");
+        //Debug.Log("[EcsVoiceRootOutputSystem] OnDestroy");
 
         Application.wantsToQuit -= OnWantsToQuit;
         BeginShutdown();
@@ -111,7 +111,7 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
         if (_created && ControlContext.builtIn.Exists(_instance))
         {
             ControlContext.builtIn.Destroy(_instance);
-            Debug.Log("[EcsVoiceRootOutputSystem] Shutdown requested for root output.");
+            //Debug.Log("[EcsVoiceRootOutputSystem] Shutdown requested for root output.");
         }
     }
 
