@@ -12,6 +12,10 @@ namespace DataOrientedAudio.Events.Runtime
 
         public float3 Position;        // Used if Space == World3D, Behaves as an offset if Space == Attached3D
         public Entity AttachTo;        // Used if Space == Attached3D
+
+        // Optional per-play gain. The explicit flag keeps existing/default-created events at unity gain.
+        public float GainMultiplier;
+        public bool UseGainMultiplier;
     }
 
     // Marks an entity as a producer of AudioEvents.

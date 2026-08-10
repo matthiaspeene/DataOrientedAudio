@@ -150,6 +150,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             {
                 ActivateVoice(ref state, selectedVoice);
                 ResetVoiceAge(ref state, selectedVoice);
+                ApplyEventGain(ref state, selectedVoice, evt);
                 ApplySpatializationSettings(ref state, selectedVoice, evt);
             }
         }
@@ -165,6 +166,15 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             var voiceActive = state.EntityManager.GetComponentData<VoiceActive>(voice);
             voiceActive.Age = 0;
             state.EntityManager.SetComponentData(voice, voiceActive);
+        }
+
+        private readonly void ApplyEventGain(ref SystemState state, Entity voice, AudioEvent evt)
+        {
+            if (!state.EntityManager.HasComponent<EventGainMod>(voice))
+                return;
+
+            float gain = evt.UseGainMultiplier ? math.max(0f, evt.GainMultiplier) : 1f;
+            state.EntityManager.SetComponentData(voice, new EventGainMod { Value = gain });
         }
 
         private readonly void ApplySpatializationSettings(ref SystemState state, Entity voice, AudioEvent evt)

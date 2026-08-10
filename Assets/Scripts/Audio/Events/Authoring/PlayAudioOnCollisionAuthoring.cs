@@ -22,6 +22,23 @@ namespace DataOrientedAudio.Events.Authoring
         [Tooltip("Minimum time between sounds from this entity, even if it touches several colliders at once.")]
         [SerializeField] private float cooldownSeconds = 0.08f;
 
+        [Header("Velocity Volume")]
+        [Min(0f)]
+        [Tooltip("Relative collision speed which produces the quiet impact gain.")]
+        [SerializeField] private float quietImpactSpeed = 1f;
+
+        [Min(0f)]
+        [Tooltip("Relative collision speed which produces the loud impact gain. Faster impacts are clamped to that gain.")]
+        [SerializeField] private float loudImpactSpeed = 12f;
+
+        [Range(0f, 2f)]
+        [Tooltip("Linear volume multiplier at or below the quiet impact speed.")]
+        [SerializeField] private float quietImpactGain = 0.08f;
+
+        [Range(0f, 2f)]
+        [Tooltip("Linear volume multiplier at or above the loud impact speed.")]
+        [SerializeField] private float loudImpactGain = 1f;
+
         private void Reset()
         {
             EnableContactEvents();
@@ -31,6 +48,10 @@ namespace DataOrientedAudio.Events.Authoring
         {
             minimumImpulse = Mathf.Max(0f, minimumImpulse);
             cooldownSeconds = Mathf.Max(0f, cooldownSeconds);
+            quietImpactSpeed = Mathf.Max(0f, quietImpactSpeed);
+            loudImpactSpeed = Mathf.Max(quietImpactSpeed + 0.01f, loudImpactSpeed);
+            quietImpactGain = Mathf.Max(0f, quietImpactGain);
+            loudImpactGain = Mathf.Max(0f, loudImpactGain);
             EnableContactEvents();
         }
 
@@ -78,6 +99,10 @@ namespace DataOrientedAudio.Events.Authoring
                     Space = authoring.voiceData.Space,
                     MinimumImpulse = authoring.minimumImpulse,
                     CooldownSeconds = authoring.cooldownSeconds,
+                    QuietImpactSpeed = authoring.quietImpactSpeed,
+                    LoudImpactSpeed = authoring.loudImpactSpeed,
+                    QuietImpactGain = authoring.quietImpactGain,
+                    LoudImpactGain = authoring.loudImpactGain,
                     NextAllowedTime = 0d
                 });
 

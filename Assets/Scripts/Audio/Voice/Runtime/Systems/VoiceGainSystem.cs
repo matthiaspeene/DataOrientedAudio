@@ -36,6 +36,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             var job = new VoiceGainJob
             {
                 MixGainLookup = SystemAPI.GetComponentLookup<MixGainMod>(true),
+                EventGainLookup = SystemAPI.GetComponentLookup<EventGainMod>(true),
                 RandomGainLookup = SystemAPI.GetComponentLookup<RandomGainMod>(true),
                 DistanceAttenLookup = SystemAPI.GetComponentLookup<DistanceAttenuationGainMod>(true),
                 SpatialGainsLookup = SystemAPI.GetBufferLookup<SpatializationChannelGains>(true),
@@ -50,6 +51,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     public partial struct VoiceGainJob : IJobEntity
     {
         [ReadOnly] public ComponentLookup<MixGainMod> MixGainLookup;
+        [ReadOnly] public ComponentLookup<EventGainMod> EventGainLookup;
         [ReadOnly] public ComponentLookup<RandomGainMod> RandomGainLookup;
         [ReadOnly] public ComponentLookup<DistanceAttenuationGainMod> DistanceAttenLookup;
         [ReadOnly] public BufferLookup<SpatializationChannelGains> SpatialGainsLookup;
@@ -61,6 +63,8 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             bool changed = false;
 
             if (MixGainLookup.HasComponent(entity) && MixGainLookup.DidChange(entity, LastSystemVersion))
+                changed = true;
+            else if (EventGainLookup.HasComponent(entity) && EventGainLookup.DidChange(entity, LastSystemVersion))
                 changed = true;
             else if (RandomGainLookup.HasComponent(entity) && RandomGainLookup.DidChange(entity, LastSystemVersion))
                 changed = true;
@@ -78,6 +82,11 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
             if (MixGainLookup.HasComponent(entity))
             {
                 baseGain *= MixGainLookup[entity].Value;
+            }
+
+            if (EventGainLookup.HasComponent(entity))
+            {
+                baseGain *= EventGainLookup[entity].Value;
             }
 
             if (RandomGainLookup.HasComponent(entity))

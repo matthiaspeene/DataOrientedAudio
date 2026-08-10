@@ -30,6 +30,12 @@ namespace DataOrientedAudio.Voice.Runtime
         public float Value;
     }
 
+    // Gain supplied by the individual AudioEvent which allocated this pooled voice.
+    public struct EventGainMod : IComponentData
+    {
+        public float Value;
+    }
+
     // Settings for distance attenuation (baked from AnimationCurve).
     public struct DistanceAttenuationSettings : ISharedComponentData
     {

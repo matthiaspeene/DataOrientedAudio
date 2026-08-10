@@ -32,6 +32,7 @@ namespace DataOrientedAudio.Events.Runtime.Systems
             {
                 CurrentTime = SystemAPI.Time.ElapsedTime,
                 PhysicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
+                VelocityLookup = SystemAPI.GetComponentLookup<PhysicsVelocity>(true),
                 SettingsLookup = SystemAPI.GetComponentLookup<PlayAudioOnCollision>(false),
                 EventBufferLookup = SystemAPI.GetBufferLookup<AudioEvent>(false)
             };
@@ -48,6 +49,9 @@ namespace DataOrientedAudio.Events.Runtime.Systems
 
             [ReadOnly]
             public PhysicsWorld PhysicsWorld;
+
+            [ReadOnly]
+            public ComponentLookup<PhysicsVelocity> VelocityLookup;
 
             [NativeDisableParallelForRestriction]
             public ComponentLookup<PlayAudioOnCollision> SettingsLookup;
@@ -67,11 +71,12 @@ namespace DataOrientedAudio.Events.Runtime.Systems
                 float3 contactPosition = details.EstimatedContactPointPositions.Length > 0
                     ? details.AverageContactPointPosition
                     : float3.zero;
+                float impactSpeed = GetRelativeSpeed(collisionEvent.EntityA, collisionEvent.EntityB);
 
                 if (playA)
-                    TryEmit(collisionEvent.EntityA, impulse, contactPosition);
+                    TryEmit(collisionEvent.EntityA, impulse, impactSpeed, contactPosition);
                 if (playB)
-                    TryEmit(collisionEvent.EntityB, impulse, contactPosition);
+                    TryEmit(collisionEvent.EntityB, impulse, impactSpeed, contactPosition);
 
                 details.EstimatedContactPointPositions.Dispose();
             }
@@ -81,18 +86,38 @@ namespace DataOrientedAudio.Events.Runtime.Systems
                 return SettingsLookup.HasComponent(entity) && EventBufferLookup.HasBuffer(entity);
             }
 
-            private void TryEmit(Entity entity, float impulse, float3 contactPosition)
+            private float GetRelativeSpeed(Entity entityA, Entity entityB)
+            {
+                float3 velocityA = VelocityLookup.TryGetComponent(entityA, out PhysicsVelocity physicsVelocityA)
+                    ? physicsVelocityA.Linear
+                    : float3.zero;
+                float3 velocityB = VelocityLookup.TryGetComponent(entityB, out PhysicsVelocity physicsVelocityB)
+                    ? physicsVelocityB.Linear
+                    : float3.zero;
+                return math.length(velocityA - velocityB);
+            }
+
+            private void TryEmit(Entity entity, float impulse, float impactSpeed, float3 contactPosition)
             {
                 PlayAudioOnCollision settings = SettingsLookup[entity];
                 if (CurrentTime < settings.NextAllowedTime || impulse < settings.MinimumImpulse)
                     return;
 
                 bool attached = settings.Space == AudioEventSpace.Attached3D;
+                float speedRange = settings.LoudImpactSpeed - settings.QuietImpactSpeed;
+                float volumeT = speedRange > math.EPSILON
+                    ? math.saturate((impactSpeed - settings.QuietImpactSpeed) / speedRange)
+                    : 1f;
+                volumeT = math.smoothstep(0f, 1f, volumeT);
+                float gain = math.lerp(settings.QuietImpactGain, settings.LoudImpactGain, volumeT);
+
                 EventBufferLookup[entity].Add(new AudioEvent
                 {
                     VoiceTypeHash = settings.VoiceTypeHash,
                     Position = attached ? float3.zero : contactPosition,
-                    AttachTo = attached ? entity : Entity.Null
+                    AttachTo = attached ? entity : Entity.Null,
+                    GainMultiplier = gain,
+                    UseGainMultiplier = true
                 });
 
                 settings.NextAllowedTime = CurrentTime + settings.CooldownSeconds;

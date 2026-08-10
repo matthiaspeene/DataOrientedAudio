@@ -13,20 +13,24 @@ MonoBehaviour:
   m_Name: BouncyBall
   m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.Voice.Authoring.VoiceDataScriptable
   _clips:
-  - {fileID: 8300000, guid: 0f46d382adacd88a2851aa2e3bf5b3cf, type: 3}
+  - {fileID: 8300000, guid: d6342b087dde9f5a281d0cccaf91a590, type: 3}
+  - {fileID: 8300000, guid: 79a91eb196b5c11798edc9bb98590d26, type: 3}
+  - {fileID: 8300000, guid: 66e82f572a456a6e9a4b19bbf020b0d5, type: 3}
+  - {fileID: 8300000, guid: 6763b6cbd166cb86f97aabe5d7dc4ab5, type: 3}
+  - {fileID: 8300000, guid: 9f8999eb9bd8e953a80519eb00da323c, type: 3}
   _gainRange:
-    Min: 1
+    Min: 0.5
     Max: 1
   _pitchRange:
     Min: -2
-    Max: 0
+    Max: 1
   _startPositionRange:
     Min: 0
     Max: 0
   _triggermode: 0
   _repeatDelayRange: {x: 0, y: 0}
   _bus: 0
-  _maxVoices: 2000
+  _maxVoices: 4000
   _space: 1
   _distanceAttenuation:
     serializedVersion: 2

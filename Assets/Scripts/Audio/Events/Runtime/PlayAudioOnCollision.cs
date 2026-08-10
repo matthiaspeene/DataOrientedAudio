@@ -13,6 +13,10 @@ namespace DataOrientedAudio.Events.Runtime
         public AudioEventSpace Space;
         public float MinimumImpulse;
         public float CooldownSeconds;
+        public float QuietImpactSpeed;
+        public float LoudImpactSpeed;
+        public float QuietImpactGain;
+        public float LoudImpactGain;
         public double NextAllowedTime;
     }
 }
