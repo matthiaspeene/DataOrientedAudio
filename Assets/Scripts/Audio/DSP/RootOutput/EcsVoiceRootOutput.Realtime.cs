@@ -50,6 +50,7 @@ namespace DataOrientedAudio.DSP.RootOutput
             // Job handles - Restored for optional parallel execution
             internal NativeArray<JobHandle> BusJobHandles;
             JobHandle mixJobHandle;
+            bool _memoryDisposed;
 
             // Profiler markers
             static readonly ProfilerMarker s_UpdateMarker = new ProfilerMarker(ProfilerCategory.Audio, "EcsVoiceRootOutput.Realtime.Update");
@@ -152,6 +153,9 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Update(UpdatedDataContext context, Pipe pipe)
             {
+                if (AudioShutdownState.IsShutdownRequested)
+                    return;
+
                 using (s_UpdateMarker.Auto())
                 {
                     foreach (var element in pipe.GetAvailableData(context))
@@ -241,6 +245,9 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Process(in RealtimeContext context, Pipe pipe, JobHandle input)
             {
+                if (AudioShutdownState.IsShutdownRequested)
+                    return;
+
                 using (s_ProcessMarker.Auto())
                 {
                     BusBuffers.Fill(0f);
@@ -559,6 +566,12 @@ namespace DataOrientedAudio.DSP.RootOutput
             {
                 using (s_EndProcessingMarker.Auto())
                 {
+                    if (AudioShutdownState.IsShutdownRequested)
+                    {
+                        CompletePendingJobs();
+                        return;
+                    }
+
                     if (EcsVoiceRootOutput.UseParallelScheduling.Data)
                     {
                         mixJobHandle.Complete();
@@ -583,15 +596,35 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public JobHandle EarlyProcessing(in RealtimeContext context, Pipe pipe)
             {
+                if (AudioShutdownState.IsShutdownRequested)
+                    return default;
+
                 // Not used in this sketch, but this is another place where you // could read messages if you wanted them as close to Process as possible. return default;
                 return default;
             }
 
+            internal void CompletePendingJobs()
+            {
+                if (!mixJobHandle.IsCompleted)
+                    mixJobHandle.Complete();
+
+                if (BusJobHandles.IsCreated)
+                {
+                    for (int i = 0; i < BusJobHandles.Length; i++)
+                    {
+                        if (!BusJobHandles[i].IsCompleted)
+                            BusJobHandles[i].Complete();
+                    }
+                }
+            }
+
             public void RemovedFromProcessing()
             {
-                // Ensure any pending jobs are completed
-                if (mixJobHandle.IsCompleted == false) mixJobHandle.Complete();
-                for (int i = 0; i < BusJobHandles.Length; i++) { if (BusJobHandles[i].IsCompleted == false) BusJobHandles[i].Complete(); }
+                if (_memoryDisposed)
+                    return;
+
+                // This is the only owner-side disposal point for realtime memory.
+                CompletePendingJobs();
 
                 if (VoiceActiveFlags.IsCreated) VoiceActiveFlags.Dispose();
                 if (Gains.IsCreated) Gains.Dispose();
@@ -625,6 +658,9 @@ namespace DataOrientedAudio.DSP.RootOutput
                     }
                     BusActiveVoices.Dispose();
                 }
+
+                _memoryDisposed = true;
+                AudioShutdownState.MarkRealtimeRemoved();
             }
         }
     }

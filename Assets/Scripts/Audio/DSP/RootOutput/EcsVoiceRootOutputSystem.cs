@@ -12,17 +12,24 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
 {
     private RootOutputInstance _instance;
     private bool _created;
+    private bool _shutdownIssued;
+    private bool _allowQuit;
 
     protected override void OnCreate()
     {
         base.OnCreate();
 
         RequireForUpdate<AudioTopologySingleton>();
+        Application.wantsToQuit += OnWantsToQuit;
     }
 
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
+
+        AudioShutdownState.Reset();
+        _shutdownIssued = false;
+        _allowQuit = false;
 
         // Get actual topology from AudioTopologySystem
         var topologySystem = World.GetExistingSystemManaged<AudioTopologySystem>();
@@ -63,20 +70,49 @@ public partial class EcsVoiceRootOutputSystem : SystemBase
 
     protected override void OnUpdate()
     {
-        // No per-frame work for now
+        if (_shutdownIssued && AudioShutdownState.IsRealtimeRemoved)
+        {
+            _allowQuit = true;
+            Application.Quit();
+        }
     }
 
     protected override void OnDestroy()
     {
         Debug.Log("[EcsVoiceRootOutputSystem] OnDestroy");
 
+        Application.wantsToQuit -= OnWantsToQuit;
+        BeginShutdown();
+
+        // Idempotent; this also prevents the bridge from being lazily recreated
+        // by a late control/ECS callback during world teardown.
+        EcsAudioBridge.Shutdown();
+
+        base.OnDestroy();
+    }
+
+    private bool OnWantsToQuit()
+    {
+        if (_allowQuit || !_created)
+            return true;
+
+        BeginShutdown();
+        return AudioShutdownState.IsRealtimeRemoved;
+    }
+
+    private void BeginShutdown()
+    {
+        if (_shutdownIssued)
+            return;
+
+        _shutdownIssued = true;
+        EcsAudioBridge.BeginShutdown();
+
         if (_created && ControlContext.builtIn.Exists(_instance))
         {
             ControlContext.builtIn.Destroy(_instance);
-            Debug.Log("[EcsVoiceRootOutputSystem] Destroyed root output.");
+            Debug.Log("[EcsVoiceRootOutputSystem] Shutdown requested for root output.");
         }
-
-        base.OnDestroy();
     }
 
 }

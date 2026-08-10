@@ -38,6 +38,13 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public JobHandle Configure(ControlContext context, ref Realtime realtime, in AudioFormat format)
             {
+                if (AudioShutdownState.IsShutdownRequested)
+                    return default;
+
+                // Configure may replace buffers. Complete any previous audio work
+                // before EnsureArray/EnsureNestedListArray can dispose them.
+                realtime.CompletePendingJobs();
+
                 var topology = DataOrientedAudio.Voice.Runtime.EcsAudioBridge.GetTopology();
 
                 // If topology is ready, use it. Otherwise fall back or wait.
@@ -124,42 +131,20 @@ namespace DataOrientedAudio.DSP.RootOutput
 
             public void Dispose(ControlContext context, ref Realtime realtime)
             {
-                if (realtime.Archetypes.IsCreated) realtime.Archetypes.Dispose();
-
-                if (realtime.Gains.IsCreated) realtime.Gains.Dispose();
-                if (realtime.VoiceActiveFlags.IsCreated) realtime.VoiceActiveFlags.Dispose();
-                if (realtime.PlaybackPositions.IsCreated) realtime.PlaybackPositions.Dispose();
-                if (realtime.PlaybackSpeeds.IsCreated) realtime.PlaybackSpeeds.Dispose();
-
-                if (realtime.BusMeta.IsCreated) realtime.BusMeta.Dispose();
-                if (realtime.BusBuffers.IsCreated) realtime.BusBuffers.Dispose();
-                //if (realtime.BusJobHandles.IsCreated) realtime.BusJobHandles.Dispose();
-
-                if (realtime.BusActiveArchetypes.IsCreated)
-                {
-                    for (int i = 0; i < realtime.BusActiveArchetypes.Length; i++)
-                    {
-                        if (realtime.BusActiveArchetypes[i].IsCreated)
-                            realtime.BusActiveArchetypes[i].Dispose();
-                    }
-                    realtime.BusActiveArchetypes.Dispose();
-                }
-
-                if (realtime.BusActiveVoices.IsCreated)
-                {
-                    for (int i = 0; i < realtime.BusActiveVoices.Length; i++)
-                    {
-                        if (realtime.BusActiveVoices[i].IsCreated)
-                            realtime.BusActiveVoices[i].Dispose();
-                    }
-                    realtime.BusActiveVoices.Dispose();
-                }
-
-                if (realtime.FinishedVoiceIndices.IsCreated) realtime.FinishedVoiceIndices.Dispose();
+                // Do not dispose realtime containers here. Control.Dispose can run
+                // while the audio callback is still winding down. Realtime owns
+                // these containers and releases them from RemovedFromProcessing,
+                // after all jobs have been completed.
+                AudioShutdownState.RequestShutdown();
+                _bootstrapSent = true;
+                _topology = default;
             }
 
             public void Update(ControlContext context, Pipe pipe)
             {
+                if (AudioShutdownState.IsShutdownRequested)
+                    return;
+
                 // Safety check: if the pipe/context is invalid (teardown), don't process.
                 // Moving the system to PresentationSystemGroup should largely prevent this, 
                 // but we add a try-catch for robustness.

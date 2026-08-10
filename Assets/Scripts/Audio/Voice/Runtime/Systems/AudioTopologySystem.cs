@@ -44,6 +44,10 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         protected override void OnDestroy()
         {
+            // Stop the realtime side before releasing the topology list and the
+            // ECS-owned blob assets referenced by that topology.
+            AudioShutdownState.RequestShutdown();
+
             if (_archetypes.IsCreated)
                 _archetypes.Dispose();
 

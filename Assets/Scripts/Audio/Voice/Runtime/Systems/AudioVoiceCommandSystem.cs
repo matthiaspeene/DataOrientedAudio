@@ -22,6 +22,9 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         protected override void OnUpdate()
         {
+            if (EcsAudioBridge.IsShuttingDown)
+                return;
+
             var commands = EcsAudioBridge.GetCommandList();
             commands.Clear();
 

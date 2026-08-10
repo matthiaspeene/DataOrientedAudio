@@ -40,6 +40,9 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         public void OnUpdate(ref SystemState state)
         {
+            if (EcsAudioBridge.IsShuttingDown)
+                return;
+
             if (!_isInitialized)
             {
                 InitializeFreeVoices(ref state);
