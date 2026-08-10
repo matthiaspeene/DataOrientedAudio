@@ -1,4 +1,4 @@
-/*
+
 using UnityEngine;
 using Unity.Entities;
 using DataOrientedAudio.Voice.Runtime;
@@ -63,4 +63,3 @@ namespace DataOrientedAudio.Debugging
         }
     }
 }
-*/
