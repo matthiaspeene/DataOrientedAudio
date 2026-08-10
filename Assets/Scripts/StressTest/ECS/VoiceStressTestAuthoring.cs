@@ -34,7 +34,7 @@ namespace DataOrientedAudio.StressTest
                         authoring.testConfig.movementBounds.y,
                         authoring.testConfig.movementBounds.z
                     ),
-                    RandomSeed = (uint)(authoring.GetInstanceID() ^ 0x9E3779B9)
+                    RandomSeed = (uint)(authoring.GetEntityId().GetHashCode() ^ 0x9E3779B9)
                 });
 
                 // Add audio event components
