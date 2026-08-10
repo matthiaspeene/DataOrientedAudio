@@ -154,9 +154,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.Events.Authoring.PlayAudioOnCollisionAuthoring
   voiceData: {fileID: 11400000, guid: eb035688b649cc71c90c657156044624, type: 2}
-  minimumImpulse: 1
   cooldownSeconds: 0.08
-  quietImpactSpeed: 0.1
-  loudImpactSpeed: 12
+  minimumImpactSpeed: 0.1
+  loudImpactSpeed: 6
   quietImpactGain: 0
-  loudImpactGain: 1.5
+  loudImpactGain: 1

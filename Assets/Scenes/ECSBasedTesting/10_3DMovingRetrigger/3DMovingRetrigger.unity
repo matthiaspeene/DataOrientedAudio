@@ -373,10 +373,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.StressTest.BouncingBallSpawnerAuthoring
   ballPrefab: {fileID: 7060146961831709488, guid: a77ee6b1fe78f5ff8b5063029cc2c4b5, type: 3}
-  initialBallCount: 10
-  ballsPerInterval: 1
+  initialBallCount: 1
+  ballsPerInterval: 0
   maximumBallCount: 10000
-  spawnInterval: 0.01
+  spawnInterval: 3
   spawnExtents: {x: 5, y: 3, z: 5}
   minimumLaunchSpeed: 4
   maximumLaunchSpeed: 25

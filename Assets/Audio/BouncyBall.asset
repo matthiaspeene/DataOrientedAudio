@@ -23,7 +23,7 @@ MonoBehaviour:
     Max: 1
   _pitchRange:
     Min: -2
-    Max: 1
+    Max: 3
   _startPositionRange:
     Min: 0
     Max: 0

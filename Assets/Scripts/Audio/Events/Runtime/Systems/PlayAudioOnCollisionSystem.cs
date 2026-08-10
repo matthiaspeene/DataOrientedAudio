@@ -13,7 +13,9 @@ namespace DataOrientedAudio.Events.Runtime.Systems
     /// Converts Unity Physics collision events into AudioEvents. If both participants have
     /// PlayAudioOnCollision, each participant can emit its own corresponding sound.
     /// </summary>
-    [UpdateInGroup(typeof(AfterPhysicsSystemGroup))]
+    [UpdateInGroup(typeof(PhysicsSystemGroup))]
+    [UpdateAfter(typeof(PhysicsSimulationGroup))]
+    [UpdateBefore(typeof(ExportPhysicsWorld))]
     [BurstCompile]
     public partial struct PlayAudioOnCollisionSystem : ISystem
     {
@@ -67,16 +69,33 @@ namespace DataOrientedAudio.Events.Runtime.Systems
                     return;
 
                 CollisionEvent.Details details = collisionEvent.CalculateDetails(ref PhysicsWorld);
-                float impulse = math.abs(details.EstimatedImpulse);
-                float3 contactPosition = details.EstimatedContactPointPositions.Length > 0
-                    ? details.AverageContactPointPosition
-                    : float3.zero;
-                float impactSpeed = GetRelativeSpeed(collisionEvent.EntityA, collisionEvent.EntityB);
+                if (details.EstimatedContactPointPositions.Length == 0)
+                {
+                    details.EstimatedContactPointPositions.Dispose();
+                    return;
+                }
+
+                float3 contactPosition = details.AverageContactPointPosition;
 
                 if (playA)
-                    TryEmit(collisionEvent.EntityA, impulse, impactSpeed, contactPosition);
+                {
+                    float impactSpeed = GetImpactSpeed(
+                        collisionEvent.EntityA,
+                        collisionEvent.EntityB,
+                        collisionEvent.BodyIndexA,
+                        contactPosition);
+                    TryEmit(collisionEvent.EntityA, impactSpeed, contactPosition);
+                }
+
                 if (playB)
-                    TryEmit(collisionEvent.EntityB, impulse, impactSpeed, contactPosition);
+                {
+                    float impactSpeed = GetImpactSpeed(
+                        collisionEvent.EntityB,
+                        collisionEvent.EntityA,
+                        collisionEvent.BodyIndexB,
+                        contactPosition);
+                    TryEmit(collisionEvent.EntityB, impactSpeed, contactPosition);
+                }
 
                 details.EstimatedContactPointPositions.Dispose();
             }
@@ -86,27 +105,37 @@ namespace DataOrientedAudio.Events.Runtime.Systems
                 return SettingsLookup.HasComponent(entity) && EventBufferLookup.HasBuffer(entity);
             }
 
-            private float GetRelativeSpeed(Entity entityA, Entity entityB)
+            private float GetImpactSpeed(
+                Entity entity,
+                Entity otherEntity,
+                int bodyIndex,
+                float3 contactPosition)
             {
-                float3 velocityA = VelocityLookup.TryGetComponent(entityA, out PhysicsVelocity physicsVelocityA)
-                    ? physicsVelocityA.Linear
+                float3 velocity = VelocityLookup.TryGetComponent(entity, out PhysicsVelocity physicsVelocity)
+                    ? physicsVelocity.Linear
                     : float3.zero;
-                float3 velocityB = VelocityLookup.TryGetComponent(entityB, out PhysicsVelocity physicsVelocityB)
-                    ? physicsVelocityB.Linear
+                float3 otherVelocity = VelocityLookup.TryGetComponent(otherEntity, out PhysicsVelocity otherPhysicsVelocity)
+                    ? otherPhysicsVelocity.Linear
                     : float3.zero;
-                return math.length(velocityA - velocityB);
+
+                // Only linear motion toward this body's contact point is impact motion.
+                // Tangential travel (including the translation of a rolling body) contributes nothing.
+                float3 bodyPosition = PhysicsWorld.Bodies[bodyIndex].WorldFromBody.pos;
+                float3 directionToContact = math.normalizesafe(contactPosition - bodyPosition);
+                return math.max(0f, math.dot(velocity - otherVelocity, directionToContact));
             }
 
-            private void TryEmit(Entity entity, float impulse, float impactSpeed, float3 contactPosition)
+            private void TryEmit(Entity entity, float impactSpeed, float3 contactPosition)
             {
                 PlayAudioOnCollision settings = SettingsLookup[entity];
-                if (CurrentTime < settings.NextAllowedTime || impulse < settings.MinimumImpulse)
+                if (CurrentTime < settings.NextAllowedTime ||
+                    impactSpeed < settings.MinimumImpactSpeed)
                     return;
 
                 bool attached = settings.Space == AudioEventSpace.Attached3D;
-                float speedRange = settings.LoudImpactSpeed - settings.QuietImpactSpeed;
+                float speedRange = settings.LoudImpactSpeed - settings.MinimumImpactSpeed;
                 float volumeT = speedRange > math.EPSILON
-                    ? math.saturate((impactSpeed - settings.QuietImpactSpeed) / speedRange)
+                    ? math.saturate((impactSpeed - settings.MinimumImpactSpeed) / speedRange)
                     : 1f;
                 volumeT = math.smoothstep(0f, 1f, volumeT);
                 float gain = math.lerp(settings.QuietImpactGain, settings.LoudImpactGain, volumeT);

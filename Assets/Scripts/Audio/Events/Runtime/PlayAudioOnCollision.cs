@@ -11,9 +11,8 @@ namespace DataOrientedAudio.Events.Runtime
     {
         public int VoiceTypeHash;
         public AudioEventSpace Space;
-        public float MinimumImpulse;
         public float CooldownSeconds;
-        public float QuietImpactSpeed;
+        public float MinimumImpactSpeed;
         public float LoudImpactSpeed;
         public float QuietImpactGain;
         public float LoudImpactGain;

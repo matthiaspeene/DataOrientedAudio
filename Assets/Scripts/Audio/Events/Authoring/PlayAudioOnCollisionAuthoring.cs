@@ -2,6 +2,7 @@ using DataOrientedAudio.Events.Runtime;
 using DataOrientedAudio.Voice.Authoring;
 using Unity.Entities;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace DataOrientedAudio.Events.Authoring
 {
@@ -15,24 +16,21 @@ namespace DataOrientedAudio.Events.Authoring
         [SerializeField] private VoiceDataScriptable voiceData;
 
         [Min(0f)]
-        [Tooltip("Contacts below this estimated solver impulse do not make a sound. This prevents resting contacts from chattering.")]
-        [SerializeField] private float minimumImpulse = 0.5f;
-
-        [Min(0f)]
         [Tooltip("Minimum time between sounds from this entity, even if it touches several colliders at once.")]
         [SerializeField] private float cooldownSeconds = 0.08f;
 
-        [Header("Velocity Volume")]
+        [Header("Impact Velocity Volume")]
         [Min(0f)]
-        [Tooltip("Relative collision speed which produces the quiet impact gain.")]
-        [SerializeField] private float quietImpactSpeed = 1f;
+        [Tooltip("Minimum relative speed toward the contact point required to play. At this speed, the quiet impact gain is used.")]
+        [FormerlySerializedAs("quietImpactSpeed")]
+        [SerializeField] private float minimumImpactSpeed = 1f;
 
         [Min(0f)]
-        [Tooltip("Relative collision speed which produces the loud impact gain. Faster impacts are clamped to that gain.")]
+        [Tooltip("Relative speed toward the contact point which produces the loud impact gain. Faster impacts are clamped to that gain.")]
         [SerializeField] private float loudImpactSpeed = 12f;
 
         [Range(0f, 2f)]
-        [Tooltip("Linear volume multiplier at or below the quiet impact speed.")]
+        [Tooltip("Linear volume multiplier at the minimum impact speed.")]
         [SerializeField] private float quietImpactGain = 0.08f;
 
         [Range(0f, 2f)]
@@ -46,10 +44,9 @@ namespace DataOrientedAudio.Events.Authoring
 
         private void OnValidate()
         {
-            minimumImpulse = Mathf.Max(0f, minimumImpulse);
             cooldownSeconds = Mathf.Max(0f, cooldownSeconds);
-            quietImpactSpeed = Mathf.Max(0f, quietImpactSpeed);
-            loudImpactSpeed = Mathf.Max(quietImpactSpeed + 0.01f, loudImpactSpeed);
+            minimumImpactSpeed = Mathf.Max(0f, minimumImpactSpeed);
+            loudImpactSpeed = Mathf.Max(minimumImpactSpeed + 0.01f, loudImpactSpeed);
             quietImpactGain = Mathf.Max(0f, quietImpactGain);
             loudImpactGain = Mathf.Max(0f, loudImpactGain);
             EnableContactEvents();
@@ -97,9 +94,8 @@ namespace DataOrientedAudio.Events.Authoring
                 {
                     VoiceTypeHash = authoring.voiceData.name.GetHashCode(),
                     Space = authoring.voiceData.Space,
-                    MinimumImpulse = authoring.minimumImpulse,
                     CooldownSeconds = authoring.cooldownSeconds,
-                    QuietImpactSpeed = authoring.quietImpactSpeed,
+                    MinimumImpactSpeed = authoring.minimumImpactSpeed,
                     LoudImpactSpeed = authoring.loudImpactSpeed,
                     QuietImpactGain = authoring.quietImpactGain,
                     LoudImpactGain = authoring.loudImpactGain,
