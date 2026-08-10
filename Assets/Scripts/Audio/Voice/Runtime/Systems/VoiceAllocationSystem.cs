@@ -15,11 +15,21 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     public partial struct VoiceAllocationSystem : ISystem
     {
         private NativeHashMap<int, NativeList<Entity>> _freeVoices; // VoiceTypeID -> List of free voices
+        private EntityQuery _voiceQuery;
         private bool _isInitialized;
 
         public void OnCreate(ref SystemState state)
         {
             _freeVoices = new NativeHashMap<int, NativeList<Entity>>(16, Allocator.Persistent);
+            _voiceQuery = state.GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<VoiceActive>(),
+                    ComponentType.ReadOnly<VoiceTypeID>()
+                },
+                Options = EntityQueryOptions.IgnoreComponentEnabledState
+            });
             _isInitialized = false;
 
             // Wait for voices to be loaded
@@ -63,17 +73,7 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
 
         private void InitializeFreeVoices(ref SystemState state)
         {
-            var query = state.GetEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<VoiceActive>(),
-                    ComponentType.ReadOnly<VoiceTypeID>()
-                },
-                Options = EntityQueryOptions.IgnoreComponentEnabledState
-            });
-
-            var entities = query.ToEntityArray(Allocator.Temp);
+            var entities = _voiceQuery.ToEntityArray(Allocator.Temp);
 
             for (int i = 0; i < entities.Length; i++)
             {
