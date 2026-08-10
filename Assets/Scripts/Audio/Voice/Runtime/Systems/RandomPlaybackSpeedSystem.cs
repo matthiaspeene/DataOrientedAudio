@@ -1,5 +1,4 @@
 using Unity.Burst;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -9,19 +8,25 @@ namespace DataOrientedAudio.Voice.Runtime.Systems
     [BurstCompile]
     public partial struct RandomPlaybackSpeedSystem : ISystem
     {
+        private Random _random;
+
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            // Keep one advancing random stream. 
+            _random = Random.CreateFromIndex(5678u);
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            uint seed = (uint)(SystemAPI.Time.ElapsedTime * 10000.0) + 5678;
-            var random = new Random(seed);
-
             foreach (var (randomSpeed, entity) in SystemAPI.Query<RefRW<RandomPlaybackSpeedMod>>()
                          .WithEntityAccess()
                          .WithAll<VoiceRandomPlaybackSpeedRange, StartVoiceRequest>())
             {
                 var range = state.EntityManager.GetSharedComponent<VoiceRandomPlaybackSpeedRange>(entity);
 
-                float t = random.NextFloat();
+                float t = _random.NextFloat();
                 float min = range.Min;
                 float max = range.Max;
 
