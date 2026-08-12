@@ -166,7 +166,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 417726771}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -225,8 +225,8 @@ Transform:
   m_GameObject: {fileID: 417726771}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: -10.45}
-  m_LocalScale: {x: 20, y: 1, z: 10}
+  m_LocalPosition: {x: 0, y: -0.1, z: -10.45}
+  m_LocalScale: {x: 20, y: 1, z: 20.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -373,10 +373,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DataOrientedAudio.StressTest.BouncingBallSpawnerAuthoring
   ballPrefab: {fileID: 7060146961831709488, guid: a77ee6b1fe78f5ff8b5063029cc2c4b5, type: 3}
-  initialBallCount: 1
+  initialBallCount: 7
   ballsPerInterval: 0
   maximumBallCount: 10000
-  spawnInterval: 3
+  spawnInterval: 0.1
   spawnExtents: {x: 5, y: 3, z: 5}
   minimumLaunchSpeed: 4
   maximumLaunchSpeed: 25
@@ -390,7 +390,7 @@ Transform:
   m_GameObject: {fileID: 647475441}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.14, y: 4, z: -2.22}
+  m_LocalPosition: {x: 0.74, y: 5.23, z: 1.65}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
